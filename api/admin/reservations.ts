@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from '../../../server/db.ts';
-import { verifyToken } from '../../../server/auth.ts';
+import { db } from '../../server/db.ts';
+import { verifyToken } from '../../server/auth.ts';
 function admin(req: VercelRequest, res: VercelResponse) {
   const h = req.headers.authorization || ''; if (!h.startsWith('Bearer ')) { res.status(401).json({ error: 'Authentication required' }); return false; }
   const t = verifyToken(h.slice(7)); if (!t) { res.status(401).json({ error: 'Invalid or expired token' }); return false; }
