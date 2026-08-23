@@ -1,0 +1,6 @@
+{
+  "name": "New Miami Restaurant",
+  "description": "Premium restaurant in Naivasha, Kenya offering authentic Kenyan, African, Continental and International cuisine with real ordering, table reservations, M-Pesa Pochi payments, and admin management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
