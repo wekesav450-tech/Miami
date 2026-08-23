@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { db, ProfileRecord } from './db.js';
+import { db, ProfileRecord } from './db.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'new_miami_restaurant_jwt_secure_key_naivasha';
 
@@ -28,66 +28,39 @@ export function verifyToken(token: string): { userId: string; email: string; rol
   }
 }
 
-export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction): void {
+export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Authentication required' });
-    return;
-  }
-
-  const token = authHeader.split(' ')[1];
-  const payload = verifyToken(token);
-  if (!payload) {
-    res.status(401).json({ error: 'Invalid or expired session token' });
-    return;
-  }
-
-  const profile = db.findProfileById(payload.userId);
-  if (!profile) {
-    res.status(401).json({ error: 'User profile not found' });
-    return;
-  }
-
-  req.user = profile;
+  if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+  const decoded = verifyToken(authHeader.slice(7));
+  if (!decoded) return res.status(401).json({ error: 'Invalid or expired token' });
+  const user = db.findProfileById(decoded.userId);
+  if (!user) return res.status(401).json({ error: 'User account not found' });
+  req.user = user;
   next();
 }
 
-export function optionalAuthMiddleware(req: AuthRequest, _res: Response, next: NextFunction): void {
+export function optionalAuthMiddleware(req: AuthRequest, _res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.split(' ')[1];
-    const payload = verifyToken(token);
-    if (payload) {
-      const profile = db.findProfileById(payload.userId);
-      if (profile) {
-        req.user = profile;
-      }
-    }
+  if (authHeader?.startsWith('Bearer ')) {
+    const decoded = verifyToken(authHeader.slice(7));
+    if (decoded) req.user = db.findProfileById(decoded.userId);
   }
   next();
 }
 
-export function adminOnlyMiddleware(req: AuthRequest, res: Response, next: NextFunction): void {
-  if (!req.user || req.user.role !== 'admin') {
-    res.status(403).json({ error: 'Access denied: Admin role required' });
-    return;
-  }
+export function adminOnlyMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.user?.role !== 'admin') return res.status(403).json({ error: 'Administrator access required' });
   next();
 }
 
 export function isValidKenyanPhone(phone: string): boolean {
-  if (!phone) return false;
-  const cleaned = phone.replace(/[\s\-()]/g, '');
-  // Matches 07xxxxxxxx, 01xxxxxxxx, +2547xxxxxxxx, +2541xxxxxxxx, 2547xxxxxxxx, 2541xxxxxxxx
-  const kenyanRegex = /^(?:254|\+254|0)?([71][0-9]{8})$/;
-  return kenyanRegex.test(cleaned);
+  return /^(?:\+254|254|0)(?:7|1)\d{8}$/.test(phone.replace(/[\s-]/g, ''));
 }
 
 export function formatKenyanPhone(phone: string): string {
-  const cleaned = phone.replace(/[\s\-()]/g, '');
-  const match = cleaned.match(/^(?:254|\+254|0)?([71][0-9]{8})$/);
-  if (match) {
-    return '0' + match[1];
-  }
-  return phone;
+  const clean = phone.replace(/[\s-]/g, '');
+  if (clean.startsWith('+254')) return clean;
+  if (clean.startsWith('254')) return `+${clean}`;
+  if (clean.startsWith('0')) return `+254${clean.slice(1)}`;
+  return clean;
 }
