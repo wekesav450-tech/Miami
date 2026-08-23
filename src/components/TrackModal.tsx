@@ -338,7 +338,7 @@ export const TrackModal: React.FC<TrackModalProps> = ({
 
                   <p className="text-xs text-stone-700">
                     Send <strong>KES {currentOrder.total_amount.toLocaleString()}</strong> to Pochi{' '}
-                    <strong className="text-[#1A1A1A] bg-amber-100 px-1.5 py-0.5 rounded border border-[#1A1A1A]">0741775878</strong> (New Miami Restaurant).
+                    <strong className="text-[#1A1A1A] bg-amber-100 px-1.5 py-0.5 rounded border border-[#1A1A1A]">0741775878</strong> (New Miami Restaurant). Submit your M-Pesa transaction reference below. Payment status remains pending until verified by authorized staff.
                   </p>
 
                   <form onSubmit={handleMpesaCodeSubmit} className="flex gap-2">

@@ -387,7 +387,7 @@ async function startServer() {
       res.json({ order: fullOrder || updated });
     } catch (err: any) {
       console.error('Update order status error:', err);
-      res.status(500).json({ error: 'Failed to update order status' });
+      res.status(400).json({ error: err.message || 'Failed to update order status' });
     }
   });
 
@@ -536,7 +536,7 @@ async function startServer() {
       res.json({ reservation: updated });
     } catch (err: any) {
       console.error('Update reservation status error:', err);
-      res.status(500).json({ error: 'Failed to update reservation status' });
+      res.status(400).json({ error: err.message || 'Failed to update reservation status' });
     }
   });
 
@@ -560,7 +560,7 @@ async function startServer() {
 
       res.json({
         success: true,
-        message: 'M-Pesa transaction code recorded. Admin will verify shortly.',
+        message: 'M-Pesa transaction reference recorded. Payment status remains pending until verified by authorized staff.',
         payment,
       });
     } catch (err: any) {

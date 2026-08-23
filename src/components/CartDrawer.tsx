@@ -223,7 +223,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </div>
 
               <p className="text-[11px] text-stone-700 leading-relaxed">
-                Send <strong>KES {placedOrder.total_amount.toLocaleString()}</strong> to Pochi <strong>0741775878</strong>. Our kitchen will verify and process your order immediately.
+                Send <strong>KES {placedOrder.total_amount.toLocaleString()}</strong> to Pochi <strong>0741775878</strong> (New Miami Restaurant). Your payment status remains <em>pending</em> until restaurant staff manually verify the transaction.
               </p>
             </div>
 
@@ -491,7 +491,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         {paymentMethod === 'mpesa_pochi' && (
                           <div className="mt-3 pt-3 border-t-2 border-[#1A1A1A]/20 text-[11px] text-stone-800 space-y-2">
                             <p>
-                              Send payment to <strong>0741775878</strong> (New Miami Restaurant). You can optionally paste your M-Pesa confirmation code below:
+                              Send payment to Pochi <strong>0741775878</strong> (New Miami Restaurant). You can optionally paste your M-Pesa transaction code below for staff to verify:
                             </p>
                             <input
                               id="order-mpesa-code-input"

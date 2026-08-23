@@ -37,6 +37,57 @@ interface AdminDashboardProps {
   onOpenAuth: () => void;
 }
 
+const VALID_ORDER_NEXT: Record<OrderStatus, { value: OrderStatus; label: string }[]> = {
+  pending: [
+    { value: 'pending', label: 'Pending' },
+    { value: 'confirmed', label: 'Confirm Order' },
+    { value: 'cancelled', label: 'Cancel Order' },
+  ],
+  confirmed: [
+    { value: 'confirmed', label: 'Confirmed' },
+    { value: 'preparing', label: 'Start Cooking (Preparing)' },
+    { value: 'cancelled', label: 'Cancel Order' },
+  ],
+  preparing: [
+    { value: 'preparing', label: 'Preparing (Cooking)' },
+    { value: 'ready', label: 'Mark Ready (Packed)' },
+    { value: 'cancelled', label: 'Cancel Order' },
+  ],
+  ready: [
+    { value: 'ready', label: 'Ready (Packed)' },
+    { value: 'out_for_delivery', label: 'Send Out for Delivery' },
+    { value: 'completed', label: 'Complete Order' },
+    { value: 'cancelled', label: 'Cancel Order' },
+  ],
+  out_for_delivery: [
+    { value: 'out_for_delivery', label: 'Out for Delivery' },
+    { value: 'completed', label: 'Complete Order (Delivered)' },
+    { value: 'cancelled', label: 'Cancel Order' },
+  ],
+  completed: [{ value: 'completed', label: 'Completed (Final)' }],
+  cancelled: [{ value: 'cancelled', label: 'Cancelled (Final)' }],
+};
+
+const VALID_RESERVATION_NEXT: Record<ReservationStatus, { value: ReservationStatus; label: string }[]> = {
+  pending: [
+    { value: 'pending', label: 'Pending' },
+    { value: 'confirmed', label: 'Confirm Table' },
+    { value: 'cancelled', label: 'Cancel Booking' },
+  ],
+  confirmed: [
+    { value: 'confirmed', label: 'Confirmed' },
+    { value: 'seated', label: 'Mark Seated' },
+    { value: 'cancelled', label: 'Cancel Booking' },
+  ],
+  seated: [
+    { value: 'seated', label: 'Seated at Table' },
+    { value: 'completed', label: 'Complete Booking' },
+    { value: 'cancelled', label: 'Cancel Booking' },
+  ],
+  completed: [{ value: 'completed', label: 'Completed (Final)' }],
+  cancelled: [{ value: 'cancelled', label: 'Cancelled (Final)' }],
+};
+
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   isOpen,
   onClose,
@@ -496,20 +547,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       {/* Change Order Status */}
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-stone-700 font-bold">Update Status:</span>
-                        <select
-                          disabled={updatingId === ord.id}
-                          value={ord.order_status}
-                          onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value as OrderStatus)}
-                          className="bg-white border-2 border-[#1A1A1A] rounded-lg px-3 py-1.5 text-xs text-[#1A1A1A] font-bold focus:outline-none shadow-[2px_2px_0px_0px_#1A1A1A]"
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="confirmed">Confirmed</option>
-                          <option value="preparing">Preparing (Cooking)</option>
-                          <option value="ready">Ready (Packed)</option>
-                          <option value="out_for_delivery">Out for Delivery</option>
-                          <option value="completed">Completed</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
+                        {ord.order_status === 'completed' || ord.order_status === 'cancelled' ? (
+                          <span
+                            className={`text-xs px-2.5 py-1 rounded-lg font-bold uppercase border-2 border-[#1A1A1A] ${
+                              ord.order_status === 'completed'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-rose-100 text-rose-800'
+                            }`}
+                          >
+                            {ord.order_status} (Final)
+                          </span>
+                        ) : (
+                          <select
+                            disabled={updatingId === ord.id}
+                            value={ord.order_status}
+                            onChange={(e) => handleUpdateOrderStatus(ord.id, e.target.value as OrderStatus)}
+                            className="bg-white border-2 border-[#1A1A1A] rounded-lg px-3 py-1.5 text-xs text-[#1A1A1A] font-bold focus:outline-none shadow-[2px_2px_0px_0px_#1A1A1A] cursor-pointer"
+                          >
+                            {(VALID_ORDER_NEXT[ord.order_status] || []).map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
 
                       {/* Payment Verification Button */}
@@ -625,18 +686,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     )}
 
                     <div className="flex items-center justify-between pt-2 border-t-2 border-[#1A1A1A]/10">
-                      <select
-                        disabled={updatingId === res.id}
-                        value={res.status}
-                        onChange={(e) => handleUpdateReservationStatus(res.id, e.target.value as ReservationStatus)}
-                        className="bg-[#F3F2EE] border-2 border-[#1A1A1A] rounded-lg px-3 py-1.5 text-xs text-[#1A1A1A] font-bold shadow-[2px_2px_0px_0px_#1A1A1A]"
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="confirmed">Confirmed</option>
-                        <option value="seated">Seated at Table</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
+                      {res.status === 'completed' || res.status === 'cancelled' ? (
+                        <span
+                          className={`text-xs px-2.5 py-1 rounded-lg font-bold uppercase border-2 border-[#1A1A1A] ${
+                            res.status === 'completed'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : 'bg-rose-100 text-rose-800'
+                          }`}
+                        >
+                          {res.status} (Final)
+                        </span>
+                      ) : (
+                        <select
+                          disabled={updatingId === res.id}
+                          value={res.status}
+                          onChange={(e) => handleUpdateReservationStatus(res.id, e.target.value as ReservationStatus)}
+                          className="bg-[#F3F2EE] border-2 border-[#1A1A1A] rounded-lg px-3 py-1.5 text-xs text-[#1A1A1A] font-bold shadow-[2px_2px_0px_0px_#1A1A1A] cursor-pointer"
+                        >
+                          {(VALID_RESERVATION_NEXT[res.status] || []).map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
 
                       <a
                         href={`https://wa.me/254${res.customer_phone.replace(/^0/, '')}?text=Hello%20${encodeURIComponent(res.customer_name)},%20confirming%20your%20table%20reservation%20at%20New%20Miami%20Restaurant%20for%20${res.reservation_date}%20at%20${res.reservation_time}`}

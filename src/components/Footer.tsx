@@ -4,13 +4,11 @@ import { UtensilsCrossed, Phone, MapPin, Clock, ShieldCheck, Heart } from 'lucid
 interface FooterProps {
   onNavigate: (section: string) => void;
   onOpenTrack: () => void;
-  onOpenAdmin: () => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({
   onNavigate,
   onOpenTrack,
-  onOpenAdmin,
 }) => {
   return (
     <footer className="bg-[#1A1A1A] text-[#F3F2EE] border-t-2 border-[#1A1A1A] text-xs">
@@ -76,14 +74,6 @@ export const Footer: React.FC<FooterProps> = ({
                   className="hover:text-amber-300 text-stone-300 font-medium transition cursor-pointer"
                 >
                   About & Location
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={onOpenAdmin}
-                  className="text-stone-400 hover:text-amber-300 font-semibold transition flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Staff & Admin Portal</span>
                 </button>
               </li>
             </ul>

@@ -196,9 +196,9 @@ class DatabaseEngine {
   }
 
   private bootstrapAdmin() {
-    const adminEmail = process.env.ADMIN_INITIAL_EMAIL || 'admin@newmiamirestaurant.co.ke';
+    const adminEmail = (process.env.ADMIN_INITIAL_EMAIL || 'admin@newmiamirestaurant.co.ke').trim().toLowerCase();
     const adminPass = process.env.ADMIN_INITIAL_PASSWORD || 'MiamiAdmin2026!Naivasha';
-    const existingAdmin = this.data.profiles.find((p) => p.email.toLowerCase() === adminEmail.toLowerCase());
+    const existingAdmin = this.data.profiles.find((p) => p.email.toLowerCase() === adminEmail);
 
     if (!existingAdmin) {
       const salt = bcrypt.genSaltSync(10);
@@ -208,7 +208,7 @@ class DatabaseEngine {
       const adminUser: ProfileRecord = {
         id: 'admin_' + crypto.randomBytes(6).toString('hex'),
         full_name: 'New Miami Admin',
-        email: adminEmail.toLowerCase(),
+        email: adminEmail,
         phone: '0741775878',
         role: 'admin',
         password_hash: hash,
@@ -217,6 +217,19 @@ class DatabaseEngine {
       };
       this.data.profiles.push(adminUser);
       console.log(`[Database] Bootstrap Admin provisioned: ${adminEmail}`);
+    } else {
+      // Ensure admin role is always maintained
+      existingAdmin.role = 'admin';
+      if (process.env.ADMIN_INITIAL_PASSWORD) {
+        // If an explicit password env is set, sync the hash if not matching
+        const matches = bcrypt.compareSync(adminPass, existingAdmin.password_hash);
+        if (!matches) {
+          const salt = bcrypt.genSaltSync(10);
+          existingAdmin.password_hash = bcrypt.hashSync(adminPass, salt);
+          existingAdmin.updated_at = new Date().toISOString();
+          console.log(`[Database] Admin password synchronized from environment for: ${adminEmail}`);
+        }
+      }
     }
   }
 
@@ -462,6 +475,26 @@ class DatabaseEngine {
     const order = this.data.orders.find((o) => o.id === orderId);
     if (!order) return null;
 
+    // Define valid state transitions
+    const validTransitions: Record<OrderRecord['order_status'], OrderRecord['order_status'][]> = {
+      pending: ['confirmed', 'cancelled'],
+      confirmed: ['preparing', 'cancelled'],
+      preparing: ['ready', 'cancelled'],
+      ready: ['out_for_delivery', 'completed', 'cancelled'],
+      out_for_delivery: ['completed', 'cancelled'],
+      completed: [], // terminal state
+      cancelled: [], // terminal state
+    };
+
+    if (order.order_status !== orderStatus) {
+      const allowedNext = validTransitions[order.order_status] || [];
+      if (!allowedNext.includes(orderStatus)) {
+        throw new Error(
+          `Cannot transition order from '${order.order_status}' to '${orderStatus}'. Allowed transitions: ${allowedNext.join(', ') || 'none (terminal state)'}`
+        );
+      }
+    }
+
     order.order_status = orderStatus;
     order.updated_at = new Date().toISOString();
     this.save();
@@ -558,6 +591,23 @@ class DatabaseEngine {
   ): ReservationRecord | null {
     const res = this.data.reservations.find((r) => r.id === id);
     if (!res) return null;
+
+    const validTransitions: Record<ReservationRecord['status'], ReservationRecord['status'][]> = {
+      pending: ['confirmed', 'cancelled'],
+      confirmed: ['seated', 'cancelled'],
+      seated: ['completed', 'cancelled'],
+      completed: [], // terminal state
+      cancelled: [], // terminal state
+    };
+
+    if (res.status !== status) {
+      const allowedNext = validTransitions[res.status] || [];
+      if (!allowedNext.includes(status)) {
+        throw new Error(
+          `Cannot transition reservation from '${res.status}' to '${status}'. Allowed transitions: ${allowedNext.join(', ') || 'none (terminal state)'}`
+        );
+      }
+    }
 
     res.status = status;
     res.updated_at = new Date().toISOString();

@@ -77,12 +77,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleQuickAdminFill = () => {
-    setEmail('admin@newmiamirestaurant.co.ke');
-    setPassword('MiamiAdmin2026!Naivasha');
-    setMode('login');
-  };
-
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-[#F3F2EE] border-2 border-[#1A1A1A] rounded-3xl w-full max-w-md text-[#1A1A1A] shadow-[8px_8px_0px_0px_#1A1A1A] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -228,19 +222,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               ? 'Sign In to Account'
               : 'Complete Registration'}
           </button>
-
-          {/* Admin Staff Quick Fill Note */}
-          <div className="pt-3 border-t-2 border-[#1A1A1A]/10 text-center">
-            <button
-              type="button"
-              onClick={handleQuickAdminFill}
-              className="text-[11px] text-stone-700 hover:text-[#1A1A1A] font-bold flex items-center justify-center gap-1 mx-auto"
-            >
-              <Shield className="w-3.5 h-3.5 text-amber-700" />
-              <span>Click to auto-fill Restaurant Admin credentials</span>
-            </button>
-          </div>
-
         </form>
       </div>
     </div>

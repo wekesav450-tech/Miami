@@ -136,8 +136,8 @@ export const Navbar: React.FC<NavbarProps> = ({
 
           {/* Right Action Icons & Auth */}
           <div className="flex items-center gap-3">
-            {/* Admin Portal Button */}
-            {user?.role === 'admin' ? (
+            {/* Admin Portal Button - ONLY rendered if authenticated user is verified admin */}
+            {user?.role === 'admin' && (
               <button
                 id="nav-admin-dashboard-btn"
                 onClick={onOpenAdmin}
@@ -145,16 +145,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               >
                 <Shield className="w-4 h-4" />
                 <span>Admin Portal</span>
-              </button>
-            ) : (
-              <button
-                id="nav-admin-login-link"
-                onClick={onOpenAdmin}
-                className="hidden lg:flex items-center gap-1 text-xs text-stone-600 hover:text-[#1A1A1A] font-semibold transition py-1.5 px-2.5 rounded border border-transparent hover:border-[#1A1A1A]"
-                title="Restaurant Staff & Admin Access"
-              >
-                <Shield className="w-3.5 h-3.5 text-stone-600" />
-                <span>Staff</span>
               </button>
             )}
 
@@ -277,16 +267,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               Book Table
             </button>
 
-            <button
-              onClick={() => {
-                onOpenAdmin();
-                setMobileMenuOpen(false);
-              }}
-              className="text-left px-3 py-2 rounded-lg text-sm font-bold text-amber-700 hover:bg-[#F3F2EE] flex items-center gap-2 border-t-2 border-[#1A1A1A] pt-2"
-            >
-              <Shield className="w-4 h-4 text-amber-600" />
-              Admin Portal
-            </button>
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => {
+                  onOpenAdmin();
+                  setMobileMenuOpen(false);
+                }}
+                className="text-left px-3 py-2 rounded-lg text-sm font-bold text-amber-700 hover:bg-[#F3F2EE] flex items-center gap-2 border-t-2 border-[#1A1A1A] pt-2"
+              >
+                <Shield className="w-4 h-4 text-amber-600" />
+                Admin Portal
+              </button>
+            )}
           </div>
         </div>
       )}

@@ -58,7 +58,7 @@ export default function App() {
     }
   }, [cart]);
 
-  // Load User Profile verification on mount
+  // Load User Profile verification on mount & check URL for direct staff route
   useEffect(() => {
     if (authStorage.getToken()) {
       api.auth
@@ -70,6 +70,19 @@ export default function App() {
           setUser(null);
         });
     }
+
+    const checkStaffRoute = () => {
+      const pathname = window.location.pathname.toLowerCase();
+      if (pathname === '/staff' || pathname === '/staff/') {
+        setIsAdminOpen(true);
+      }
+    };
+
+    checkStaffRoute();
+    window.addEventListener('popstate', checkStaffRoute);
+    return () => {
+      window.removeEventListener('popstate', checkStaffRoute);
+    };
   }, []);
 
   // Fetch Menu Categories and Items
@@ -268,7 +281,6 @@ export default function App() {
       <Footer
         onNavigate={handleNavigate}
         onOpenTrack={() => setIsTrackOpen(true)}
-        onOpenAdmin={() => setIsAdminOpen(true)}
       />
 
       {/* Modals & Drawers */}
@@ -301,7 +313,12 @@ export default function App() {
 
       <AdminDashboard
         isOpen={isAdminOpen}
-        onClose={() => setIsAdminOpen(false)}
+        onClose={() => {
+          setIsAdminOpen(false);
+          if (window.location.pathname.toLowerCase() === '/staff') {
+            window.history.replaceState({}, '', '/');
+          }
+        }}
         user={user}
         onOpenAuth={() => setIsAuthOpen(true)}
       />
