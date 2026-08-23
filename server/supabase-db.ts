@@ -12,9 +12,11 @@ export interface SupabaseProfile {
 }
 
 function config() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) throw new Error('Supabase environment variables are not configured');
+  // Support both the legacy service-role variable and Supabase's newer server secret key.
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  if (!url) throw new Error('Missing SUPABASE_URL environment variable');
+  if (!key) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY environment variable');
   return { url: url.replace(/\/$/, ''), key };
 }
 
@@ -31,7 +33,14 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
   });
   const text = await response.text();
-  if (!response.ok) throw new Error(`Supabase ${response.status}: ${text}`);
+  if (!response.ok) {
+    let detail = text;
+    try {
+      const parsed = JSON.parse(text);
+      detail = parsed.message || parsed.error_description || parsed.error || text;
+    } catch { /* keep raw response */ }
+    throw new Error(`Supabase request failed (${response.status}): ${detail}`);
+  }
   return text ? JSON.parse(text) : (null as T);
 }
 
