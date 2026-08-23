@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { ensureInitialAdmin, findProfileByEmail, verifyPassword } from '../../server/supabase-db.ts';
-import { generateToken } from '../../server/auth.ts';
+import { ensureInitialAdmin, findProfileByEmail, verifyPassword } from '../../server/supabase-db.js';
+import { generateToken } from '../../server/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -11,7 +11,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const normalizedEmail = String(email).trim().toLowerCase();
     let profile = await findProfileByEmail(normalizedEmail);
 
-    // Provision the configured initial administrator in Supabase on first admin login.
     if (!profile && process.env.ADMIN_INITIAL_EMAIL?.trim().toLowerCase() === normalizedEmail) {
       profile = await ensureInitialAdmin();
     }
