@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { findProfileById } from '../../server/supabase-db.ts';
-import { verifyToken } from '../../server/auth.ts';
+import { findProfileById } from '../../server/supabase-db.js';
+import { verifyToken } from '../../server/auth.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
