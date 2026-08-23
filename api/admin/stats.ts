@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from '../../../server/db.ts';
-import { verifyToken } from '../../../server/auth.ts';
+import { db } from '../../server/db.ts';
+import { verifyToken } from '../../server/auth.ts';
 
 function admin(req: VercelRequest, res: VercelResponse) {
   const header = req.headers.authorization || '';
