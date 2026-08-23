@@ -12,12 +12,15 @@ export interface SupabaseProfile {
 }
 
 function config() {
-  // Support both the legacy service-role variable and Supabase's newer server secret key.
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  // Accept the project URL with or without /rest/v1, because either form may
+  // have been copied from Supabase/Vercel. The REST path is added below.
+  const rawUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
-  if (!url) throw new Error('Missing SUPABASE_URL environment variable');
+  if (!rawUrl) throw new Error('Missing SUPABASE_URL environment variable');
   if (!key) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY environment variable');
-  return { url: url.replace(/\/$/, ''), key };
+
+  const url = rawUrl.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/i, '');
+  return { url, key: key.trim() };
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -32,15 +35,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       ...(init.headers || {}),
     },
   });
+
   const text = await response.text();
   if (!response.ok) {
     let detail = text;
     try {
       const parsed = JSON.parse(text);
-      detail = parsed.message || parsed.error_description || parsed.error || text;
+      detail = parsed.message || parsed.error_description || parsed.error || parsed.hint || text;
     } catch { /* keep raw response */ }
     throw new Error(`Supabase request failed (${response.status}): ${detail}`);
   }
+
   return text ? JSON.parse(text) : (null as T);
 }
 
