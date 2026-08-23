@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 export interface SupabaseProfile {
   id: string;
@@ -12,28 +13,39 @@ export interface SupabaseProfile {
 }
 
 function config() {
-  // Accept the project URL with or without /rest/v1, because either form may
-  // have been copied from Supabase/Vercel. The REST path is added below.
   const rawUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!rawUrl) throw new Error('Missing SUPABASE_URL environment variable');
-  if (!key) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY environment variable');
+  if (!key) throw new Error('Missing SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY environment variable');
 
   const url = rawUrl.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/i, '');
-  return { url, key: key.trim() };
+  const normalizedKey = key.trim();
+  const isNewSecretKey = normalizedKey.startsWith('sb_secret_');
+  return { url, key: normalizedKey, isNewSecretKey };
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const { url, key } = config();
+  const { url, key, isNewSecretKey } = config();
+  const headers: Record<string, string> = {
+    apikey: key,
+    'Content-Type': 'application/json',
+    Prefer: 'return=representation',
+  };
+
+  // New sb_secret_* keys are opaque API keys, not JWTs. Supabase requires
+  // them in `apikey` and rejects them when sent as Authorization: Bearer.
+  // Legacy service_role keys are JWT API keys and can use both headers.
+  if (!isNewSecretKey) {
+    headers.Authorization = `Bearer ${key}`;
+  }
+
+  for (const [name, value] of Object.entries(init.headers || {})) {
+    headers[name] = String(value);
+  }
+
   const response = await fetch(`${url}/rest/v1/${path}`, {
     ...init,
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-      ...(init.headers || {}),
-    },
+    headers,
   });
 
   const text = await response.text();
