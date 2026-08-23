@@ -6,7 +6,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const app = await getApp();
     return app(req, res);
   } catch (error) {
-    console.error('API handler boot error:', error);
+    console.error('Miami API initialization failed:', error);
     return res.status(500).json({ error: 'API failed to initialize' });
   }
 }
