@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { db, ProfileRecord } from './db.ts';
+import type { ProfileRecord } from './db.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'new_miami_restaurant_jwt_secure_key_naivasha';
 
@@ -8,13 +8,9 @@ export interface AuthRequest extends Request {
   user?: ProfileRecord;
 }
 
-export function generateToken(profile: ProfileRecord): string {
+export function generateToken(profile: Pick<ProfileRecord, 'id' | 'email' | 'role'>): string {
   return jwt.sign(
-    {
-      userId: profile.id,
-      email: profile.email,
-      role: profile.role,
-    },
+    { userId: profile.id, email: profile.email, role: profile.role },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -33,9 +29,6 @@ export function authMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
   const decoded = verifyToken(authHeader.slice(7));
   if (!decoded) return res.status(401).json({ error: 'Invalid or expired token' });
-  const user = db.findProfileById(decoded.userId);
-  if (!user) return res.status(401).json({ error: 'User account not found' });
-  req.user = user;
   next();
 }
 
@@ -43,7 +36,7 @@ export function optionalAuthMiddleware(req: AuthRequest, _res: Response, next: N
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
     const decoded = verifyToken(authHeader.slice(7));
-    if (decoded) req.user = db.findProfileById(decoded.userId);
+    if (decoded) req.user = undefined;
   }
   next();
 }
