@@ -66,7 +66,11 @@ async function apiRequest<T>(
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(data.error || `Request failed with status ${response.status}`);
+    const message =
+      typeof data.detail === 'string' && data.detail.trim()
+        ? `${data.error || 'Request failed'} — ${data.detail}`
+        : data.error || `Request failed with status ${response.status}`;
+    throw new Error(message);
   }
 
   return data as T;
