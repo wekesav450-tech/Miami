@@ -260,15 +260,25 @@ export const api = {
       const res = await apiRequest<{ stats: AdminStats }>('/api/admin/stats');
       return res.stats;
     },
+    async updateSettings(settings: { delivery_fee_kes?: number; phone?: string; address?: string }): Promise<any> {
+      return apiRequest('/api/admin/settings', {
+        method: 'PATCH',
+        body: JSON.stringify(settings),
+      });
+    },
+  },
+
+  settings: {
+    async get(): Promise<{ settings: { delivery_fee_kes: number; currency: string; business_name: string; pochi_number: string; phone: string; address: string } }> {
+      return apiRequest('/api/settings');
+    },
   },
 
   realtime: {
     connect(onMessage: (event: { type: string; data: any; timestamp: string }) => void): () => void {
       const token = authStorage.getToken();
-      const profile = authStorage.getProfile();
       const params = new URLSearchParams();
-      if (profile?.role) params.append('role', profile.role);
-      if (profile?.id) params.append('userId', profile.id);
+      if (token) params.append('token', token);
 
       const eventSource = new EventSource(`/api/realtime/stream?${params.toString()}`);
 
@@ -276,7 +286,7 @@ export const api = {
         try {
           const parsed = JSON.parse(e.data);
           onMessage(parsed);
-        } catch (err) {
+        } catch {
           // ignore heartbeat / invalid json
         }
       };

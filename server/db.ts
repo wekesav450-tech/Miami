@@ -105,6 +105,16 @@ export interface PaymentRecord {
   created_at: string;
 }
 
+export interface RestaurantSettingsRecord {
+  delivery_fee_kes: number;
+  currency: string;
+  business_name: string;
+  pochi_number: string;
+  phone: string;
+  address: string;
+  updated_at: string;
+}
+
 interface DatabaseSchema {
   profiles: ProfileRecord[];
   menu_categories: CategoryRecord[];
@@ -113,9 +123,20 @@ interface DatabaseSchema {
   order_items: OrderItemRecord[];
   reservations: ReservationRecord[];
   payments: PaymentRecord[];
+  settings?: RestaurantSettingsRecord;
 }
 
 const DB_FILE_PATH = path.join(process.cwd(), 'database.json');
+
+const DEFAULT_SETTINGS: RestaurantSettingsRecord = {
+  delivery_fee_kes: 150, // Standard Naivasha local delivery fee
+  currency: 'KES',
+  business_name: 'New Miami Restaurant',
+  pochi_number: '0741775878',
+  phone: '0741775878',
+  address: 'Kenyatta Avenue, Naivasha, Kenya',
+  updated_at: new Date().toISOString(),
+};
 
 class DatabaseEngine {
   private data: DatabaseSchema = {
@@ -126,6 +147,7 @@ class DatabaseEngine {
     order_items: [],
     reservations: [],
     payments: [],
+    settings: { ...DEFAULT_SETTINGS },
   };
 
   private isInitialized = false;
@@ -149,6 +171,9 @@ class DatabaseEngine {
           order_items: Array.isArray(parsed.order_items) ? parsed.order_items : [],
           reservations: Array.isArray(parsed.reservations) ? parsed.reservations : [],
           payments: Array.isArray(parsed.payments) ? parsed.payments : [],
+          settings: parsed.settings && typeof parsed.settings.delivery_fee_kes === 'number'
+            ? { ...DEFAULT_SETTINGS, ...parsed.settings }
+            : { ...DEFAULT_SETTINGS },
         };
       }
     } catch (err) {
@@ -370,8 +395,9 @@ class DatabaseEngine {
       });
     }
 
-    // Standard Naivasha local delivery fee: KES 150 (if delivery)
-    const deliveryFee = payload.order_type === 'delivery' ? 150 : 0;
+    // Standard Naivasha local delivery fee: configurable by admin (default KES 150)
+    const activeDeliveryFee = this.getSettings().delivery_fee_kes;
+    const deliveryFee = payload.order_type === 'delivery' ? activeDeliveryFee : 0;
     const totalAmount = subtotal + deliveryFee;
 
     const order: OrderRecord = {
@@ -657,6 +683,27 @@ class DatabaseEngine {
       totalMenuItemsCount: this.data.menu_items.length,
       todayRevenueKes: todayRevenue,
     };
+  }
+
+  // --- Restaurant Settings ---
+  public getSettings(): RestaurantSettingsRecord {
+    if (!this.data.settings) {
+      this.data.settings = { ...DEFAULT_SETTINGS };
+    }
+    return { ...this.data.settings };
+  }
+
+  public updateSettings(partial: Partial<RestaurantSettingsRecord>): RestaurantSettingsRecord {
+    if (!this.data.settings) {
+      this.data.settings = { ...DEFAULT_SETTINGS };
+    }
+    this.data.settings = {
+      ...this.data.settings,
+      ...partial,
+      updated_at: new Date().toISOString(),
+    };
+    this.save();
+    return { ...this.data.settings };
   }
 }
 

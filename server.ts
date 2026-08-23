@@ -6,6 +6,7 @@ import { createServer as createViteServer } from 'vite';
 import { db } from './server/db.js';
 import {
   generateToken,
+  verifyToken,
   authMiddleware,
   optionalAuthMiddleware,
   adminOnlyMiddleware,
@@ -46,10 +47,53 @@ async function startServer() {
     });
 
     const clientId = 'conn_' + crypto.randomBytes(6).toString('hex');
-    const role = (req.query.role as string) || undefined;
-    const userId = (req.query.userId as string) || undefined;
+    const rawToken = (req.query.token as string) || (req.headers.authorization?.replace(/^Bearer\s+/i, ''));
+    
+    let role: 'admin' | 'customer' | 'guest' = 'guest';
+    let userId: string | undefined = undefined;
+
+    if (rawToken) {
+      const decoded = verifyToken(rawToken);
+      if (decoded) {
+        role = decoded.role as 'admin' | 'customer';
+        userId = decoded.userId;
+      }
+    }
 
     realtimeHub.registerClient(clientId, res, role, userId);
+  });
+
+  // --- RESTAURANT SETTINGS ROUTES ---
+  app.get('/api/settings', (_req, res) => {
+    try {
+      const settings = db.getSettings();
+      res.json({ settings });
+    } catch (err: any) {
+      console.error('Fetch settings error:', err);
+      res.status(500).json({ error: 'Failed to fetch restaurant settings' });
+    }
+  });
+
+  app.patch('/api/admin/settings', authMiddleware, adminOnlyMiddleware, (req, res) => {
+    try {
+      const { delivery_fee_kes, phone, address, business_name, pochi_number } = req.body;
+      const updates: any = {};
+      if (typeof delivery_fee_kes === 'number' && delivery_fee_kes >= 0) {
+        updates.delivery_fee_kes = delivery_fee_kes;
+      }
+      if (phone && typeof phone === 'string') updates.phone = phone.trim();
+      if (address && typeof address === 'string') updates.address = address.trim();
+      if (business_name && typeof business_name === 'string') updates.business_name = business_name.trim();
+      if (pochi_number && typeof pochi_number === 'string') updates.pochi_number = pochi_number.trim();
+
+      const updated = db.updateSettings(updates);
+      realtimeHub.broadcastPublic('settings_updated', updated);
+
+      res.json({ settings: updated, message: 'Settings updated successfully' });
+    } catch (err: any) {
+      console.error('Update settings error:', err);
+      res.status(500).json({ error: 'Failed to update restaurant settings' });
+    }
   });
 
   // --- AUTH ROUTES ---
@@ -209,7 +253,7 @@ async function startServer() {
         return;
       }
 
-      realtimeHub.broadcast('menu_updated', updated);
+      realtimeHub.broadcastPublic('menu_updated', updated);
       res.json({ item: updated });
     } catch (err: any) {
       console.error('Update menu item error:', err);
@@ -287,9 +331,9 @@ async function startServer() {
         items,
       });
 
-      // Broadcast real-time order creation event
-      realtimeHub.broadcast('new_order', {
-        order: result.order,
+      // Broadcast real-time order creation event securely
+      realtimeHub.broadcastOrderEvent('new_order', {
+        ...result.order,
         items: result.items,
         payment: result.payment,
       });
@@ -382,7 +426,7 @@ async function startServer() {
       }
 
       const fullOrder = db.getOrderByIdOrNumber(orderId);
-      realtimeHub.broadcast('order_updated', fullOrder || updated);
+      realtimeHub.broadcastOrderEvent('order_updated', fullOrder || updated);
 
       res.json({ order: fullOrder || updated });
     } catch (err: any) {
@@ -409,7 +453,7 @@ async function startServer() {
       }
 
       const fullOrder = db.getOrderByIdOrNumber(orderId);
-      realtimeHub.broadcast('order_updated', fullOrder || result);
+      realtimeHub.broadcastOrderEvent('order_updated', fullOrder || result);
 
       res.json(result);
     } catch (err: any) {
@@ -477,7 +521,7 @@ async function startServer() {
         special_requests,
       });
 
-      realtimeHub.broadcast('new_reservation', reservation);
+      realtimeHub.broadcastReservationEvent('new_reservation', reservation);
 
       res.status(201).json({
         reservation,
@@ -532,7 +576,7 @@ async function startServer() {
         return;
       }
 
-      realtimeHub.broadcast('reservation_updated', updated);
+      realtimeHub.broadcastReservationEvent('reservation_updated', updated);
       res.json({ reservation: updated });
     } catch (err: any) {
       console.error('Update reservation status error:', err);
@@ -556,7 +600,7 @@ async function startServer() {
       }
 
       const fullOrder = db.getOrderByIdOrNumber(order_id);
-      realtimeHub.broadcast('order_updated', fullOrder);
+      realtimeHub.broadcastOrderEvent('order_updated', fullOrder);
 
       res.json({
         success: true,
