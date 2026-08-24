@@ -163,24 +163,35 @@ async function createApp() {
     }
   });
 
-  app.post('/api/orders', optionalAuthMiddleware, (req: AuthRequest, res) => {
+  app.post('/api/orders', optionalAuthMiddleware, async (req: AuthRequest, res) => {
     try {
       const { customer_name, customer_phone, customer_email, order_type, delivery_address, notes, payment_method, transaction_reference, items } = req.body;
       if (!customer_name || typeof customer_name !== 'string' || customer_name.trim().length < 2) return res.status(400).json({ error: 'Please provide your full name' });
       if (!customer_phone || !isValidKenyanPhone(customer_phone)) return res.status(400).json({ error: 'Please enter a valid Kenyan phone number (e.g. 0741775878)' });
       const validOrderTypes = ['pickup', 'delivery', 'dine_in'];
       if (!validOrderTypes.includes(order_type)) return res.status(400).json({ error: 'Invalid order type' });
-      if (order_type === 'delivery' && (!delivery_address || delivery_address.trim().length < 4)) return res.status(400).json({ error: 'Please provide a detailed delivery address in Naivasha' });
+      if (order_type === 'delivery' && (!delivery_address || delivery_address.trim().length < 4)) return res.status(400).json({ error: 'Please provide a detailed delivery address' });
       const validPaymentMethods = ['mpesa_pochi', 'paywave_express'];
       if (!validPaymentMethods.includes(payment_method)) return res.status(400).json({ error: 'Invalid payment method' });
       if (!items || !Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'Cart is empty. Please select menu items.' });
       for (const it of items) if (!it.menu_item_id || !it.quantity || it.quantity < 1) return res.status(400).json({ error: 'Invalid item quantity in order' });
-      const customerId = req.user ? req.user.id : null;
-      const result = db.createOrderAtomic({ customer_id: customerId, customer_name, customer_phone: formatKenyanPhone(customer_phone), customer_email: customer_email || (req.user ? req.user.email : null), order_type, delivery_address, notes, payment_method, transaction_reference, items });
-      realtimeHub.broadcastOrderEvent('new_order', { ...result.order, items: result.items, payment: result.payment });
+
+      // Orders have one production source of truth: Supabase.
+      const result = await createSupabaseOrder({
+        customer_id: req.user ? req.user.id : null,
+        customer_name,
+        customer_phone: formatKenyanPhone(customer_phone),
+        customer_email: customer_email || (req.user ? req.user.email : null),
+        order_type,
+        delivery_address,
+        notes,
+        payment_method,
+        transaction_reference,
+        items,
+      });
       res.status(201).json({ order: result.order, items: result.items, payment: result.payment, pochiNumber: '0741775878', pochiName: 'New Miami Restaurant' });
     } catch (err: any) {
-      console.error('Order creation error:', err);
+      console.error('Supabase order creation error:', err);
       res.status(400).json({ error: err.message || 'Failed to place order' });
     }
   });
