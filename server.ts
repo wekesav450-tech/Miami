@@ -265,6 +265,23 @@ async function createApp() {
     }
   });
 
+  app.patch('/api/admin/reservations/:id/status', authMiddleware, adminOnlyMiddleware, (req, res) => {
+    try {
+      const { status } = req.body;
+      const validStatuses = ['pending', 'confirmed', 'seated', 'completed', 'cancelled'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Invalid reservation status' });
+      }
+      const reservation = db.updateReservationStatus(req.params.id, status);
+      if (!reservation) return res.status(404).json({ error: 'Reservation not found' });
+      realtimeHub.broadcastOrderEvent('reservation_updated', reservation);
+      res.json({ reservation });
+    } catch (err: any) {
+      console.error('Update reservation status error:', err);
+      res.status(400).json({ error: err.message || 'Failed to update reservation status' });
+    }
+  });
+
   app.get('/api/admin/stats', authMiddleware, adminOnlyMiddleware, (_req, res) => {
     try {
       const stats = db.getAdminStats();
