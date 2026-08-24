@@ -70,3 +70,26 @@ export async function createSupabaseOrder(payload: { customer_id: string | null;
   }
   return { order, items: orderItems, payment };
 }
+
+
+export async function updateSupabaseOrderStatus(orderId: string, orderStatus: string) {
+  const rows = await request<any[]>(
+    `orders?id=eq.${encodeURIComponent(orderId)}`,
+    { method: 'PATCH', body: JSON.stringify({ order_status: orderStatus, updated_at: new Date().toISOString() }) }
+  );
+  return rows[0] || null;
+}
+
+export async function updateSupabaseOrderPayment(orderId: string, paymentStatus: string, transactionReference?: string | null) {
+  const rows = await request<any[]>(
+    `orders?id=eq.${encodeURIComponent(orderId)}`,
+    { method: 'PATCH', body: JSON.stringify({ payment_status: paymentStatus, updated_at: new Date().toISOString() }) }
+  );
+  const order = rows[0] || null;
+  if (!order) return null;
+  const paymentBody: Record<string, unknown> = { status: paymentStatus };
+  if (transactionReference !== undefined) paymentBody.transaction_reference = transactionReference || null;
+  if (paymentStatus === 'paid') paymentBody.completed_at = new Date().toISOString();
+  await request(`payments?order_id=eq.${encodeURIComponent(orderId)}`, { method: 'PATCH', body: JSON.stringify(paymentBody) });
+  return order;
+}
