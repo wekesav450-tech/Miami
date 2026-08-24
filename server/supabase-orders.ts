@@ -25,6 +25,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return text ? JSON.parse(text) : (null as T);
 }
 
+export async function getSupabaseOrders(filters: { orderStatus?: string; paymentStatus?: string } = {}) {
+  const params = new URLSearchParams();
+  params.set('select', '*');
+  params.set('order', 'created_at.desc');
+  if (filters.orderStatus) params.set('order_status', `eq.${filters.orderStatus}`);
+  if (filters.paymentStatus) params.set('payment_status', `eq.${filters.paymentStatus}`);
+  return request<any[]>(`orders?${params.toString()}`);
+}
+
 export async function createSupabaseOrder(payload: { customer_id: string | null; customer_name: string; customer_phone: string; customer_email: string | null; order_type: 'pickup' | 'delivery' | 'dine_in'; delivery_address: string | null; notes: string | null; payment_method: 'mpesa_pochi' | 'paywave_express'; transaction_reference?: string; items: { menu_item_id: string; quantity: number }[]; }) {
   const ids = [...new Set(payload.items.map((item) => item.menu_item_id))];
   const menuItems = await request<MenuItemRow[]>(`menu_items?id=in.(${ids.map(encodeURIComponent).join(',')})&select=id,name,price_kes,is_available`);
