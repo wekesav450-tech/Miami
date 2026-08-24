@@ -4,7 +4,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { createServer as createViteServer } from 'vite';
 import { db } from './server/db.js';
-import { createSupabaseOrder, getSupabaseOrders } from './server/supabase-orders.ts';
+import { createSupabaseOrder, getSupabaseOrders, updateSupabaseOrderStatus, updateSupabaseOrderPayment } from './server/supabase-orders.ts';
 import {
   generateToken,
   verifyToken,
@@ -233,129 +233,35 @@ async function createApp() {
     }
   });
 
-  app.patch('/api/admin/orders/:id/status', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  app.patch('/api/admin/orders/:id/status', authMiddleware, adminOnlyMiddleware, async (req, res) => {
     try {
       const orderId = req.params.id;
       const { order_status } = req.body;
       const validStatuses = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed', 'cancelled'];
       if (!validStatuses.includes(order_status)) return res.status(400).json({ error: 'Invalid order status' });
-      const updated = db.updateOrderStatus(orderId, order_status);
+      const updated = await updateSupabaseOrderStatus(orderId, order_status);
       if (!updated) return res.status(404).json({ error: 'Order not found' });
-      const fullOrder = db.getOrderByIdOrNumber(orderId);
-      realtimeHub.broadcastOrderEvent('order_updated', fullOrder || updated);
-      res.json({ order: fullOrder || updated });
+      realtimeHub.broadcastOrderEvent('order_updated', updated);
+      res.json({ order: updated });
     } catch (err: any) {
-      console.error('Update order status error:', err);
-      res.status(400).json({ error: err.message || 'Failed to update order status' });
+      console.error('Update Supabase order status error:', err);
+      res.status(500).json({ error: err.message || 'Failed to update order status' });
     }
   });
 
-  app.patch('/api/admin/orders/:id/payment', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  app.patch('/api/admin/orders/:id/payment', authMiddleware, adminOnlyMiddleware, async (req, res) => {
     try {
       const orderId = req.params.id;
       const { payment_status, transaction_reference } = req.body;
       const validStatuses = ['pending', 'paid', 'failed', 'cancelled'];
       if (!validStatuses.includes(payment_status)) return res.status(400).json({ error: 'Invalid payment status' });
-      const result = db.updateOrderPaymentStatus(orderId, payment_status, transaction_reference);
-      if (!result) return res.status(404).json({ error: 'Order not found' });
-      const fullOrder = db.getOrderByIdOrNumber(orderId);
-      realtimeHub.broadcastOrderEvent('order_updated', fullOrder || result);
-      res.json(result);
+      const updated = await updateSupabaseOrderPayment(orderId, payment_status, transaction_reference);
+      if (!updated) return res.status(404).json({ error: 'Order not found' });
+      realtimeHub.broadcastOrderEvent('order_updated', updated);
+      res.json({ order: updated });
     } catch (err: any) {
-      console.error('Update payment status error:', err);
-      res.status(500).json({ error: 'Failed to update payment status' });
-    }
-  });
-
-  app.post('/api/reservations', optionalAuthMiddleware, (req: AuthRequest, res) => {
-    try {
-      const { customer_name, customer_phone, customer_email, reservation_date, reservation_time, number_of_guests, special_requests } = req.body;
-      if (!customer_name || typeof customer_name !== 'string' || customer_name.trim().length < 2) return res.status(400).json({ error: 'Please enter your full name' });
-      if (!customer_phone || !isValidKenyanPhone(customer_phone)) return res.status(400).json({ error: 'Please enter a valid Kenyan phone number (e.g. 0741775878)' });
-      if (!reservation_date) return res.status(400).json({ error: 'Please select a reservation date' });
-      const todayStr = new Date().toISOString().split('T')[0];
-      if (reservation_date < todayStr) return res.status(400).json({ error: 'Reservation date cannot be in the past' });
-      if (!reservation_time) return res.status(400).json({ error: 'Please select a reservation time' });
-      const guests = Number(number_of_guests);
-      if (isNaN(guests) || guests < 1 || guests > 50) return res.status(400).json({ error: 'Number of guests must be between 1 and 50' });
-      const customerId = req.user ? req.user.id : null;
-      const reservation = db.createReservation({ customer_id: customerId, customer_name, customer_phone: formatKenyanPhone(customer_phone), customer_email: customer_email || (req.user ? req.user.email : null), reservation_date, reservation_time, number_of_guests: guests, special_requests });
-      realtimeHub.broadcastReservationEvent('new_reservation', reservation);
-      res.status(201).json({ reservation, restaurantPhone: '0741775878', message: 'Table reservation request received. We will confirm shortly!' });
-    } catch (err: any) {
-      console.error('Reservation creation error:', err);
-      res.status(500).json({ error: 'Failed to create table reservation' });
-    }
-  });
-
-  app.get('/api/reservations/my-reservations', authMiddleware, (req: AuthRequest, res) => {
-    try {
-      if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
-      const reservations = db.getReservations({ customerId: req.user.id });
-      res.json({ reservations });
-    } catch (err: any) {
-      console.error('Fetch customer reservations error:', err);
-      res.status(500).json({ error: 'Failed to retrieve your reservations' });
-    }
-  });
-
-  app.get('/api/admin/reservations', authMiddleware, adminOnlyMiddleware, (req, res) => {
-    try {
-      const status = req.query.status as string;
-      const reservations = db.getReservations({ status });
-      res.json({ reservations });
-    } catch (err: any) {
-      console.error('Fetch admin reservations error:', err);
-      res.status(500).json({ error: 'Failed to retrieve reservations' });
-    }
-  });
-
-  app.patch('/api/admin/reservations/:id/status', authMiddleware, adminOnlyMiddleware, (req, res) => {
-    try {
-      const resId = req.params.id;
-      const { status } = req.body;
-      const validStatuses = ['pending', 'confirmed', 'seated', 'completed', 'cancelled'];
-      if (!validStatuses.includes(status)) return res.status(400).json({ error: 'Invalid reservation status' });
-      const updated = db.updateReservationStatus(resId, status);
-      if (!updated) return res.status(404).json({ error: 'Reservation not found' });
-      realtimeHub.broadcastReservationEvent('reservation_updated', updated);
-      res.json({ reservation: updated });
-    } catch (err: any) {
-      console.error('Update reservation status error:', err);
-      res.status(400).json({ error: err.message || 'Failed to update reservation status' });
-    }
-  });
-
-  app.post('/api/payments/mpesa-pochi/submit-reference', (req, res) => {
-    try {
-      const { order_id, transaction_reference } = req.body;
-      if (!order_id || !transaction_reference || transaction_reference.trim().length < 5) return res.status(400).json({ error: 'Please enter a valid M-Pesa transaction code (e.g. QKH789XYZ)' });
-      const payment = db.updateOrderTransactionRef(order_id, transaction_reference);
-      if (!payment) return res.status(404).json({ error: 'Order payment record not found' });
-      const fullOrder = db.getOrderByIdOrNumber(order_id);
-      realtimeHub.broadcastOrderEvent('order_updated', fullOrder);
-      res.json({ success: true, message: 'M-Pesa transaction reference recorded. Payment status remains pending until verified by authorized staff.', payment });
-    } catch (err: any) {
-      console.error('Submit M-Pesa reference error:', err);
-      res.status(500).json({ error: 'Failed to record transaction reference' });
-    }
-  });
-
-  app.post('/api/payments/paywave/initiate', (req, res) => {
-    try {
-      const { order_id, phone } = req.body;
-      if (!order_id) return res.status(400).json({ error: 'Order ID is required' });
-      const orderData = db.getOrderByIdOrNumber(order_id);
-      if (!orderData) return res.status(404).json({ error: 'Order not found' });
-      const paywaveKey = process.env.PAYWAVE_API_KEY;
-      const paywaveSecret = process.env.PAYWAVE_API_SECRET;
-      if (!paywaveKey || !paywaveSecret) {
-        return res.status(200).json({ status: 'pending', configured: false, message: 'PayWave Express prompt integration is awaiting active merchant credentials. Please complete payment via M-Pesa Pochi to 0741775878.', pochiNumber: '0741775878', pochiName: 'New Miami Restaurant' });
-      }
-      res.status(200).json({ status: 'prompt_sent', configured: true, message: `Payment prompt initiated to ${phone || orderData.customer_phone}` });
-    } catch (err: any) {
-      console.error('PayWave initiate error:', err);
-      res.status(500).json({ error: 'Payment processing error' });
+      console.error('Update Supabase payment error:', err);
+      res.status(500).json({ error: err.message || 'Failed to update payment status' });
     }
   });
 
