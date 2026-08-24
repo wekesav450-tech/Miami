@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { createServer as createViteServer } from 'vite';
 import { db } from './server/db.js';
+import { createSupabaseOrder, getSupabaseOrders } from './server/supabase-orders.ts';
 import {
   generateToken,
   verifyToken,
@@ -220,11 +221,11 @@ async function createApp() {
     }
   });
 
-  app.get('/api/admin/orders', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  app.get('/api/admin/orders', authMiddleware, adminOnlyMiddleware, async (req, res) => {
     try {
       const orderStatus = req.query.order_status as string;
       const paymentStatus = req.query.payment_status as string;
-      const orders = db.getOrders({ orderStatus, paymentStatus });
+      const orders = await getSupabaseOrders({ orderStatus, paymentStatus });
       res.json({ orders });
     } catch (err: any) {
       console.error('Fetch admin orders error:', err);
