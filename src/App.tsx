@@ -192,9 +192,24 @@ export default function App() {
   };
 
   const handleAuthSuccess = (profile: UserProfile) => {
-    setUser(profile);
+    const normalizedProfile: UserProfile = {
+      ...profile,
+      role: String(profile.role || '').toLowerCase() === 'admin' ? 'admin' : profile.role,
+    };
+    setUser(normalizedProfile);
+
+    if (normalizedProfile.role === 'admin') {
+      setIsAdminOpen(true);
+      window.history.replaceState({}, '', '/staff');
+      setToast({
+        message: 'Welcome back, ' + normalizedProfile.full_name + '! Opening Admin Dashboard...',
+        type: 'success',
+      });
+      return;
+    }
+
     setToast({
-      message: `Welcome, ${profile.full_name}!`,
+      message: 'Welcome, ' + normalizedProfile.full_name + '!',
       type: 'success',
     });
   };
