@@ -181,7 +181,7 @@ async function createApp() {
       const result = await createSupabaseOrder({
         customer_id: req.user ? req.user.id : null,
         customer_name,
-        customer_phone: formatKenyanPhone(customer_phone),
+        customer_phone: formatKenyanPhone(String(customer_phone).replace(/[\s-]/g, '')),
         customer_email: customer_email || (req.user ? req.user.email : null),
         order_type,
         delivery_address,
@@ -267,11 +267,11 @@ async function createApp() {
 
   app.post('/api/reservations', optionalAuthMiddleware, (req: AuthRequest, res) => {
     try {
-      const { customer_name, customer_phone, customer_email, reservation_date, reservation_time, party_size, special_requests } = req.body;
+      const { customer_name, customer_phone, customer_email, reservation_date, reservation_time, party_size, number_of_guests, special_requests } = req.body;
       if (!customer_name || String(customer_name).trim().length < 2) return res.status(400).json({ error: 'Please provide your full name' });
-      if (!customer_phone || !isValidKenyanPhone(customer_phone)) return res.status(400).json({ error: 'Please provide a valid Kenyan phone number' });
+      if (!customer_phone || !isValidKenyanPhone(String(customer_phone).replace(/[\s-]/g, ''))) return res.status(400).json({ error: 'Please provide a valid Kenyan phone number (e.g. 0741775878, 254741775878, or +254741775878)' });
       if (!reservation_date || !reservation_time) return res.status(400).json({ error: 'Please select a reservation date and time' });
-      const size = Number(party_size);
+      const size = Number(party_size ?? number_of_guests);
       if (!Number.isInteger(size) || size < 1 || size > 50) return res.status(400).json({ error: 'Party size must be between 1 and 50' });
 
       const reservation = db.createReservation({
