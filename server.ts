@@ -265,6 +265,17 @@ async function createApp() {
     }
   });
 
+  app.get('/api/admin/reservations', authMiddleware, adminOnlyMiddleware, (req, res) => {
+    try {
+      const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+      const reservations = db.getReservations({ status });
+      res.json({ reservations });
+    } catch (err: any) {
+      console.error('Get admin reservations error:', err);
+      res.status(500).json({ error: err.message || 'Failed to load reservations' });
+    }
+  });
+
   app.patch('/api/admin/reservations/:id/status', authMiddleware, adminOnlyMiddleware, (req, res) => {
     try {
       const { status } = req.body;
