@@ -30,6 +30,15 @@ async function supabaseRows(path: string) {
   return text ? JSON.parse(text) : [];
 }
 
+function isSameLocalDay(value: unknown, now = new Date()) {
+  if (!value) return false;
+  const date = new Date(String(value));
+  return Number.isFinite(date.getTime()) &&
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -39,26 +48,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const paidOrders = orders.filter((o: any) => o.payment_status === 'paid');
     const pendingOrders = orders.filter((o: any) => o.order_status === 'pending');
     const completedOrders = orders.filter((o: any) => o.order_status === 'completed');
-    const totalRevenue = paidOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+    const totalRevenueKes = paidOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
+    const todayRevenueKes = paidOrders
+      .filter((o: any) => isSameLocalDay(o.created_at))
+      .reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
 
-    const stats = {
-      total_orders: orders.length,
-      pending_orders: pendingOrders.length,
-      completed_orders: completedOrders.length,
-      total_revenue: totalRevenue,
-      paid_orders: paidOrders.length,
-      total_reservations: 0,
-      pending_reservations: 0,
-      totalOrders: orders.length,
-      pendingOrders: pendingOrders.length,
-      completedOrders: completedOrders.length,
-      totalRevenue,
-      paidOrders: paidOrders.length,
-      totalReservations: 0,
-      pendingReservations: 0,
-    };
-
-    return res.status(200).json({ stats });
+    // Match the exact AdminDashboard/AdminStats contract so the React UI never
+    // receives undefined values and calls toLocaleString() on them.
+    return res.status(200).json({
+      todayRevenueKes,
+      totalRevenueKes,
+      pendingOrdersCount: pendingOrders.length,
+      totalOrdersCount: orders.length,
+      activeReservationsCount: 0,
+      totalMenuItemsCount: 0,
+      completedOrdersCount: completedOrders.length,
+      paidOrdersCount: paidOrders.length,
+    });
   } catch (error) {
     console.error('Admin stats API failed:', error);
     return res.status(500).json({ error: 'Failed to compute admin statistics', detail: error instanceof Error ? error.message : String(error) });
