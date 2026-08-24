@@ -24,27 +24,47 @@ export function verifyToken(token: string): { userId: string; email: string; rol
   }
 }
 
-export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
+async function getSupabaseProfile(token: string): Promise<ProfileRecord | null> {
+  const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '').replace(/\/rest\/v1$/i, '');
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '').trim();
+  if (!url || !key) return null;
+  const headers: Record<string, string> = { apikey: key, Authorization: `Bearer ${token}` };
+  const userResponse = await fetch(`${url}/auth/v1/user`, { headers });
+  if (!userResponse.ok) return null;
+  const authUser = await userResponse.json() as { id: string; email?: string };
+  const profileResponse = await fetch(`${url}/rest/v1/profiles?id=eq.${encodeURIComponent(authUser.id)}&select=*`, { headers });
+  if (!profileResponse.ok) return null;
+  const profiles = await profileResponse.json() as ProfileRecord[];
+  return profiles[0] || null;
+}
+
+export async function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+  const token = authHeader.slice(7);
 
-  const decoded = verifyToken(authHeader.slice(7));
+  // Accept the current Supabase access token used by the frontend.
+  const supabaseProfile = await getSupabaseProfile(token);
+  if (supabaseProfile) { req.user = supabaseProfile; return next(); }
+
+  // Backward-compatible fallback for older locally issued tokens.
+  const decoded = verifyToken(token);
   if (!decoded) return res.status(401).json({ error: 'Invalid or expired token' });
-
-  // Resolve the current profile from the database. Authorization must use the
-  // persisted role, not just the role claim embedded in an old token.
   const profile = db.findProfileById(decoded.userId);
   if (!profile) return res.status(401).json({ error: 'User account not found' });
-
   req.user = profile;
   next();
 }
 
-export function optionalAuthMiddleware(req: AuthRequest, _res: Response, next: NextFunction) {
+export async function optionalAuthMiddleware(req: AuthRequest, _res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
-    const decoded = verifyToken(authHeader.slice(7));
-    if (decoded) req.user = db.findProfileById(decoded.userId);
+    const token = authHeader.slice(7);
+    req.user = await getSupabaseProfile(token) || undefined;
+    if (!req.user) {
+      const decoded = verifyToken(token);
+      if (decoded) req.user = db.findProfileById(decoded.userId);
+    }
   }
   next();
 }
