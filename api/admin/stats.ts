@@ -35,31 +35,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
     if (!(await admin(req, res))) return;
 
-    const [orders, reservations] = await Promise.all([
-      supabaseRows('orders?select=id,total_amount,payment_status,order_status,created_at'),
-      supabaseRows('reservations?select=id,status,created_at'),
-    ]);
-
+    const orders = await supabaseRows('orders?select=id,total_amount,payment_status,order_status,created_at');
     const paidOrders = orders.filter((o: any) => o.payment_status === 'paid');
     const pendingOrders = orders.filter((o: any) => o.order_status === 'pending');
-    const pendingReservations = reservations.filter((r: any) => r.status === 'pending');
+    const completedOrders = orders.filter((o: any) => o.order_status === 'completed');
     const totalRevenue = paidOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
 
     const stats = {
       total_orders: orders.length,
       pending_orders: pendingOrders.length,
-      completed_orders: orders.filter((o: any) => o.order_status === 'completed').length,
+      completed_orders: completedOrders.length,
       total_revenue: totalRevenue,
       paid_orders: paidOrders.length,
-      total_reservations: reservations.length,
-      pending_reservations: pendingReservations.length,
+      total_reservations: 0,
+      pending_reservations: 0,
       totalOrders: orders.length,
       pendingOrders: pendingOrders.length,
-      completedOrders: orders.filter((o: any) => o.order_status === 'completed').length,
+      completedOrders: completedOrders.length,
       totalRevenue,
       paidOrders: paidOrders.length,
-      totalReservations: reservations.length,
-      pendingReservations: pendingReservations.length,
+      totalReservations: 0,
+      pendingReservations: 0,
     };
 
     return res.status(200).json({ stats });
