@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getApp } from '../server.ts';
+import { getApp } from '../dist/server.cjs';
 
 function restoreApiPath(req: VercelRequest) {
   const rawPath = req.query.path;
   if (!rawPath) return;
 
-  const path = Array.isArray(rawPath) ? rawPath.join('/') : String(rawPath);
+  const apiPath = Array.isArray(rawPath) ? rawPath.join('/') : String(rawPath);
   const query = new URLSearchParams();
 
   for (const [key, value] of Object.entries(req.query)) {
@@ -14,7 +14,7 @@ function restoreApiPath(req: VercelRequest) {
     else if (value !== undefined) query.set(key, String(value));
   }
 
-  req.url = `/api/${path}${query.toString() ? `?${query.toString()}` : ''}`;
+  req.url = `/api/${apiPath}${query.toString() ? `?${query.toString()}` : ''}`;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
