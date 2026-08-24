@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import {
   MenuCategory,
   MenuItem,
@@ -12,6 +13,11 @@ import {
 
 const TOKEN_KEY = 'nmr_auth_token';
 const USER_KEY = 'nmr_user_profile';
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_PUBLISHABLE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string;
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) throw new Error('Missing Supabase frontend environment variables');
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 export const authStorage = {
   getToken(): string | null { return localStorage.getItem(TOKEN_KEY); },
@@ -52,14 +58,30 @@ export const api = {
       authStorage.setToken(res.token); authStorage.setProfile(res.profile); return res;
     },
     async login(data: { email: string; password: string }): Promise<{ profile: UserProfile; token: string }> {
-      const res = await apiRequest<{ profile: UserProfile; token: string }>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) });
-      authStorage.setToken(res.token); authStorage.setProfile(res.profile); return res;
+      const { data: authData, error } = await supabase.auth.signInWithPassword({ email: data.email.trim(), password: data.password });
+      if (error) throw new Error(error.message);
+      const authUser = authData.user;
+      if (!authUser || !authData.session) throw new Error('Supabase did not return an authenticated session');
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, phone, role, created_at, updated_at')
+        .eq('id', authUser.id)
+        .single();
+      if (profileError || !profileData) { await supabase.auth.signOut(); throw new Error('Your account profile could not be loaded'); }
+      const profile = profileData as UserProfile;
+      authStorage.setToken(authData.session.access_token); authStorage.setProfile(profile);
+      return { profile, token: authData.session.access_token };
     },
     async getMe(): Promise<UserProfile | null> {
-      try { const res = await apiRequest<{ profile: UserProfile }>('/api/auth/me'); authStorage.setProfile(res.profile); return res.profile; }
-      catch { authStorage.clear(); return null; }
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('No authenticated user');
+        const { data, error } = await supabase.from('profiles').select('id, full_name, email, phone, role, created_at, updated_at').eq('id', user.id).single();
+        if (error || !data) throw error || new Error('Profile not found');
+        const profile = data as UserProfile; authStorage.setProfile(profile); return profile;
+      } catch { authStorage.clear(); return null; }
     },
-    logout() { authStorage.clear(); },
+    logout() { void supabase.auth.signOut(); authStorage.clear(); },
   },
   menu: {
     async getCategories(): Promise<MenuCategory[]> { const res = await apiRequest<{ categories: MenuCategory[] }>('/api/menu/categories'); return res.categories; },
