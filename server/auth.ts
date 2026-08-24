@@ -4,24 +4,14 @@ import { db, type ProfileRecord } from './db.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'new_miami_restaurant_jwt_secure_key_naivasha';
 
-export interface AuthRequest extends Request {
-  user?: ProfileRecord;
-}
+export interface AuthRequest extends Request { user?: ProfileRecord; }
 
 export function generateToken(profile: Pick<ProfileRecord, 'id' | 'email' | 'role'>): string {
-  return jwt.sign(
-    { userId: profile.id, email: profile.email, role: profile.role },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  return jwt.sign({ userId: profile.id, email: profile.email, role: profile.role }, JWT_SECRET, { expiresIn: '7d' });
 }
 
 export function verifyToken(token: string): { userId: string; email: string; role: string } | null {
-  try {
-    return jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string };
-  } catch {
-    return null;
-  }
+  try { return jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string }; } catch { return null; }
 }
 
 async function getSupabaseProfile(token: string): Promise<ProfileRecord | null> {
@@ -42,12 +32,8 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
   const token = authHeader.slice(7);
-
-  // Accept the current Supabase access token used by the frontend.
   const supabaseProfile = await getSupabaseProfile(token);
   if (supabaseProfile) { req.user = supabaseProfile; return next(); }
-
-  // Backward-compatible fallback for older locally issued tokens.
   const decoded = verifyToken(token);
   if (!decoded) return res.status(401).json({ error: 'Invalid or expired token' });
   const profile = db.findProfileById(decoded.userId);
@@ -61,10 +47,7 @@ export async function optionalAuthMiddleware(req: AuthRequest, _res: Response, n
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
     req.user = await getSupabaseProfile(token) || undefined;
-    if (!req.user) {
-      const decoded = verifyToken(token);
-      if (decoded) req.user = db.findProfileById(decoded.userId);
-    }
+    if (!req.user) { const decoded = verifyToken(token); if (decoded) req.user = db.findProfileById(decoded.userId); }
   }
   next();
 }
@@ -75,13 +58,15 @@ export function adminOnlyMiddleware(req: AuthRequest, res: Response, next: NextF
 }
 
 export function isValidKenyanPhone(phone: string): boolean {
-  return /^(?:\+254|254|0)(?:7|1)\d{8}$/.test(phone.replace(/[\s-]/g, ''));
+  const clean = String(phone || '').trim().replace(/[\s()\-]/g, '');
+  return /^(?:\+?254|0)(?:7|1)\d{8}$/.test(clean) || /^[71]\d{8}$/.test(clean);
 }
 
 export function formatKenyanPhone(phone: string): string {
-  const clean = phone.replace(/[\s-]/g, '');
+  const clean = String(phone || '').trim().replace(/[\s()\-]/g, '');
   if (clean.startsWith('+254')) return clean;
   if (clean.startsWith('254')) return `+${clean}`;
   if (clean.startsWith('0')) return `+254${clean.slice(1)}`;
+  if (/^[71]\d{8}$/.test(clean)) return `+254${clean}`;
   return clean;
 }
