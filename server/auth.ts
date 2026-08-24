@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import type { ProfileRecord } from './db.ts';
+import { db, type ProfileRecord } from './db.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'new_miami_restaurant_jwt_secure_key_naivasha';
 
@@ -27,8 +27,16 @@ export function verifyToken(token: string): { userId: string; email: string; rol
 export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+
   const decoded = verifyToken(authHeader.slice(7));
   if (!decoded) return res.status(401).json({ error: 'Invalid or expired token' });
+
+  // Resolve the current profile from the database. Authorization must use the
+  // persisted role, not just the role claim embedded in an old token.
+  const profile = db.findProfileById(decoded.userId);
+  if (!profile) return res.status(401).json({ error: 'User account not found' });
+
+  req.user = profile;
   next();
 }
 
@@ -36,7 +44,7 @@ export function optionalAuthMiddleware(req: AuthRequest, _res: Response, next: N
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
     const decoded = verifyToken(authHeader.slice(7));
-    if (decoded) req.user = undefined;
+    if (decoded) req.user = db.findProfileById(decoded.userId);
   }
   next();
 }
