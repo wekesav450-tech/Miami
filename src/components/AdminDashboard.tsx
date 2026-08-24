@@ -108,13 +108,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [editingPriceId, setEditingPriceId] = useState<string | null>(null);
   const [tempPrice, setTempPrice] = useState<string>('');
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = String(user?.role || '').toLowerCase().trim() === 'admin';
 
   const loadAdminData = async () => {
     if (!isAdmin) return;
     setIsLoading(true);
     try {
-      const [fetchedStats, fetchedOrders, fetchedRes, fetchedMenu] = await Promise.all([
+      // Load the order queue independently. A failure in stats, reservations,
+      // or menu data must never hide valid Supabase orders.
+      const [statsResult, ordersResult, reservationsResult, menuResult] = await Promise.allSettled([
         api.admin.getStats(),
         api.orders.getAdminOrders({
           order_status: orderStatusFilter !== 'all' ? orderStatusFilter : undefined,
@@ -123,10 +125,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         api.reservations.getAdminReservations(reservationStatusFilter),
         api.menu.getItems(true),
       ]);
-      setStats(fetchedStats);
-      setOrders(fetchedOrders);
-      setReservations(fetchedRes);
-      setMenuItems(fetchedMenu);
+      if (statsResult.status === 'fulfilled') setStats(statsResult.value);
+      if (ordersResult.status === 'fulfilled') {
+        setOrders(ordersResult.value);
+      } else {
+        console.error('Failed to load orders:', ordersResult.reason);
+      }
+      if (reservationsResult.status === 'fulfilled') setReservations(reservationsResult.value);
+      if (menuResult.status === 'fulfilled') setMenuItems(menuResult.value);
     } catch (err) {
       console.error('Failed to load admin data:', err);
     } finally {
