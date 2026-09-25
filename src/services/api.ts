@@ -68,7 +68,7 @@ export const api = {
   },
   orders: {
     async create(payload: CreateOrderPayload): Promise<{ order: Order; pochiNumber: string; pochiName: string }> { return apiRequest('/api/orders', { method: 'POST', body: JSON.stringify(payload) }); },
-    async track(orderNumber: string): Promise<Order> { const res = await apiRequest<{ order: Order }>(`/api/orders/track/${encodeURIComponent(orderNumber)}`); return res.order; },
+    async track(orderNumber: string, phone?: string): Promise<Order> { const query = phone ? `?phone=${encodeURIComponent(phone)}` : ''; const res = await apiRequest<{ order: Order }>(`/api/orders/track/${encodeURIComponent(orderNumber)}${query}`); return res.order; },
     async getMyOrders(): Promise<Order[]> { const res = await apiRequest<{ orders: Order[] }>('/api/orders/my-orders'); return res.orders; },
     async getAdminOrders(filters?: { order_status?: string; payment_status?: string }): Promise<Order[]> { const params = new URLSearchParams(); if (filters?.order_status) params.append('order_status', filters.order_status); if (filters?.payment_status) params.append('payment_status', filters.payment_status); const res = await apiRequest<{ orders: Order[] }>(`/api/admin/orders?${params.toString()}`); return res.orders; },
     async updateStatus(orderId: string, order_status: Order['order_status']): Promise<Order> { const res = await apiRequest<{ order: Order }>(`/api/admin/orders/${orderId}/status`, { method: 'PATCH', body: JSON.stringify({ order_status }) }); return res.order; },
