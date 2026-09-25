@@ -40,7 +40,7 @@ export async function createSupabaseOrder(payload: { customer_id: string | null;
   const menuMap = new Map(menuItems.map((item) => [item.id, item]));
   const now = new Date().toISOString();
   const orderId = `ord_${crypto.randomUUID()}`;
-  const orderNumber = `NMR-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+  const orderNumber = `NMR-${new Date().getFullYear()}-${crypto.randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`;
   let subtotal = 0;
   const orderItems: Array<Record<string, unknown>> = [];
   for (const requested of payload.items) {
