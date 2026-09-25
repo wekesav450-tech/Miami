@@ -29,7 +29,7 @@ async function createApp() {
       const cleanPhone = String(phone || '').trim().replace(/[\s()\-]/g, '');
       if (!isValidKenyanPhone(cleanPhone)) return res.status(400).json({ error: 'Please provide a valid Kenyan phone number' });
 
-      const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
+      const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
       const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '').trim();
       if (!url || !key) return res.status(500).json({ error: 'Supabase server authentication is not configured' });
 
@@ -139,14 +139,14 @@ async function createApp() {
       if (!order) return res.status(404).json({ error: 'Order not found' });
       const [items, payments] = await Promise.all([
         (async () => {
-          const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
+          const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
           const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
           if (!url || !key) return [];
           const r = await fetch(url + '/rest/v1/order_items?order_id=eq.' + encodeURIComponent(order.id) + '&select=*', { headers: { apikey: key, Authorization: 'Bearer ' + key } });
           return r.ok ? await r.json() : [];
         })(),
         (async () => {
-          const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
+          const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
           const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
           if (!url || !key) return [];
           const r = await fetch(url + '/rest/v1/payments?order_id=eq.' + encodeURIComponent(order.id) + '&select=*', { headers: { apikey: key, Authorization: 'Bearer ' + key } });
@@ -174,7 +174,7 @@ async function createApp() {
 
   app.get('/api/settings', async (_req, res) => {
     try {
-      const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
+      const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
       const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
       if (!url || !key) return res.status(500).json({ error: 'Supabase server configuration is missing' });
       const r = await fetch(url + '/rest/v1/settings?select=delivery_fee_kes,currency,business_name,pochi_number,phone,address&limit=1', { headers: { apikey: key, Authorization: 'Bearer ' + key } });
@@ -192,7 +192,7 @@ async function createApp() {
       const order = orders.find((o: any) => o.id === order_id);
       if (!order) return res.status(404).json({ error: 'Order not found' });
       if (order.customer_id && order.customer_id !== req.user?.id) return res.status(403).json({ error: 'You can only submit payment for your own order' });
-      const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
+      const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
       const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
       const r = await fetch(url + '/rest/v1/payments?order_id=eq.' + encodeURIComponent(order_id), { method: 'PATCH', headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify({ transaction_reference: String(transaction_reference).trim().toUpperCase() }) });
       if (!r.ok) throw new Error(await r.text());
@@ -217,7 +217,7 @@ async function createApp() {
       const updates: Record<string, unknown> = {};
       for (const key of allowed) if (req.body?.[key] !== undefined) updates[key] = req.body[key];
       updates.updated_at = new Date().toISOString();
-      const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
+      const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
       const secret = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
       if (!url || !secret) return res.status(500).json({ error: 'Supabase server configuration is missing' });
       const r = await fetch(url + '/rest/v1/settings', { method: 'PATCH', headers: { apikey: secret, Authorization: 'Bearer ' + secret, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(updates) });
