@@ -274,7 +274,7 @@ async function createApp() {
     catch (err: any) { console.error('Update reservation status error:', err); res.status(500).json({ error: err.message || 'Failed to update reservation status' }); }
   });
 
-  if (process.env.NODE_ENV !== 'production') {
+  // Return JSON for unknown API routes instead of falling through to the SPA.\n  // This prevents serverless /api requests from trying to read dist/index.html.\n  app.use('/api', (_req, res) => res.status(404).json({ error: 'API endpoint not found' }));\n\n  if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
     app.use(vite.middlewares);
   } else {
