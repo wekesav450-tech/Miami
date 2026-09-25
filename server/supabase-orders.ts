@@ -3,7 +3,7 @@ import crypto from 'crypto';
 interface MenuItemRow { id: string; name: string; price_kes: number; is_available: boolean; }
 
 function config() {
-  const rawUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const rawUrl = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!rawUrl) throw new Error('Missing SUPABASE_URL environment variable');
   if (!key) throw new Error('Missing Supabase server key environment variable');
