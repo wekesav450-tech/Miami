@@ -45,7 +45,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 
 export const api = {
   auth: {
-    async register(data: { full_name: string; email: string; phone: string; password: string }): Promise<{ profile: UserProfile; token: string }> { const res = await apiRequest<{ profile: UserProfile; token: string }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }); authStorage.setToken(res.token); authStorage.setProfile(res.profile); return res; },
+    async register(data: { full_name: string; email: string; phone: string; password: string }): Promise<{ profile: UserProfile; token: string }> { const res = await apiRequest<{ profile: UserProfile; token: string; refresh_token?: string }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }); if (supabase && res.token && res.refresh_token) { const { error } = await supabase.auth.setSession({ access_token: res.token, refresh_token: res.refresh_token }); if (error) throw new Error(error.message); } authStorage.setToken(res.token); authStorage.setProfile(res.profile); return { profile: res.profile, token: res.token }; },
     async login(data: { email: string; password: string }): Promise<{ profile: UserProfile; token: string }> {
       const { data: authData, error } = await requireSupabase().auth.signInWithPassword({ email: data.email.trim(), password: data.password });
       if (error) throw new Error(error.message);
