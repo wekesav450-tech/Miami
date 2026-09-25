@@ -55,8 +55,11 @@ export async function createSupabaseOrder(payload: { customer_id: string | null;
   let deliveryFee = 0;
   try {
     const settings = await request<Array<{ delivery_fee_kes: number }>>('settings?select=delivery_fee_kes&limit=1');
-    deliveryFee = payload.order_type === 'delivery' ? Number(settings[0]?.delivery_fee_kes ?? 150) : 0;
-  } catch { deliveryFee = payload.order_type === 'delivery' ? 150 : 0; }
+    if (payload.order_type === 'delivery') {
+      if (!settings[0] || !Number.isFinite(Number(settings[0].delivery_fee_kes)) || Number(settings[0].delivery_fee_kes) < 0) throw new Error('Restaurant delivery fee is not configured');
+      deliveryFee = Number(settings[0].delivery_fee_kes);
+    }
+  } catch (error) { throw error; }
   const totalAmount = subtotal + deliveryFee;
   const order = { id: orderId, order_number: orderNumber, customer_id: payload.customer_id, customer_name: payload.customer_name.trim(), customer_phone: payload.customer_phone.trim(), customer_email: payload.customer_email?.trim().toLowerCase() || null, order_type: payload.order_type, delivery_address: payload.order_type === 'delivery' ? payload.delivery_address?.trim() || null : null, subtotal, delivery_fee: deliveryFee, total_amount: totalAmount, payment_method: payload.payment_method, payment_status: 'pending', order_status: 'pending', notes: payload.notes?.trim() || null, created_at: now, updated_at: now };
   const payment = { id: `pay_${crypto.randomUUID()}`, order_id: orderId, payment_method: payload.payment_method, amount: totalAmount, currency: 'KES', transaction_reference: payload.transaction_reference?.trim() || null, provider_response: null, status: 'pending', initiated_at: now, completed_at: null, created_at: now };
