@@ -87,6 +87,24 @@ async function createApp(): Promise<import('express').Express> {
     }
   });
 
+  // Authenticated profile endpoint. The server reads profiles with the service role so
+  // customer login does not depend on client-side profiles RLS policies.
+  app.get('/api/auth/profile', authMiddleware, async (req: AuthRequest, res) => {
+    try {
+      const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+      const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+      if (!url || !key) return res.status(500).json({ error: 'Supabase server authentication is not configured' });
+      const r = await fetch(url + '/rest/v1/profiles?id=eq.' + encodeURIComponent(req.user!.id) + '&select=id,full_name,email,phone,role,created_at,updated_at&limit=1', { headers: { apikey: key, Authorization: 'Bearer ' + key } });
+      if (!r.ok) throw new Error(await r.text());
+      const rows = await r.json();
+      if (!Array.isArray(rows) || !rows[0]) return res.status(404).json({ error: 'Customer profile could not be found' });
+      res.json({ profile: rows[0] });
+    } catch (err: any) {
+      console.error('Authenticated profile lookup error:', err);
+      res.status(500).json({ error: 'Failed to load customer profile' });
+    }
+  });
+
   // Menu is persistent in Supabase. Vercel must never write menu state to the server filesystem.
   app.get('/api/menu/categories', async (_req, res) => {
     try { res.json({ categories: await getSupabaseCategories() }); }
