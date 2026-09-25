@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import type { ProfileRecord } from './db.ts';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'new_miami_restaurant_jwt_secure_key_naivasha';
+const JWT_SECRET = (process.env.JWT_SECRET || '').trim();
+if (!JWT_SECRET) throw new Error('JWT_SECRET is required');
 
 export interface AuthRequest extends Request { user?: ProfileRecord; }
 
@@ -15,9 +16,9 @@ export function verifyToken(token: string): { userId: string; email: string; rol
 }
 
 async function getSupabaseProfile(token: string): Promise<ProfileRecord | null> {
-  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '').replace(/\/rest\/v1$/i, '');
-  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '').trim();
-  if (!url || !key) return null;
+  const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '').replace(/\/rest\/v1$/i, '');
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  if (!url || !key) throw new Error('Supabase server authentication is not configured');
   const headers: Record<string, string> = { apikey: key, Authorization: `Bearer ${token}` };
   const userResponse = await fetch(`${url}/auth/v1/user`, { headers });
   if (!userResponse.ok) return null;
@@ -34,9 +35,6 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
   const token = authHeader.slice(7);
   const supabaseProfile = await getSupabaseProfile(token);
   if (supabaseProfile) { req.user = supabaseProfile; return next(); }
-  const decoded = verifyToken(token);
-  if (!decoded) return res.status(401).json({ error: 'Invalid or expired token' });
-  // Supabase is the production identity source. Do not fall back to the Vercel filesystem database.
   return res.status(401).json({ error: 'Invalid or expired authentication session' });
 }
 
@@ -45,7 +43,7 @@ export async function optionalAuthMiddleware(req: AuthRequest, _res: Response, n
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
     req.user = await getSupabaseProfile(token) || undefined;
-    if (!req.user) { verifyToken(token); }
+    if (!req.user) return res.status(401).json({ error: 'Invalid or expired authentication session' });
   }
   next();
 }
