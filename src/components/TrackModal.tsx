@@ -207,6 +207,16 @@ export const TrackModal: React.FC<TrackModalProps> = ({
                 className="w-full bg-white border-2 border-[#1A1A1A] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#1A1A1A] placeholder-stone-400 focus:outline-none shadow-[2px_2px_0px_0px_#1A1A1A]"
               />
             </div>
+            <div className="relative">
+              <Phone className="w-4 h-4 text-stone-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="tel"
+                placeholder="Customer phone (e.g. 0741775878)"
+                value={phoneQuery}
+                onChange={(e) => setPhoneQuery(e.target.value)}
+                className="w-full bg-white border-2 border-[#1A1A1A] rounded-xl pl-10 pr-4 py-2.5 text-sm text-[#1A1A1A] placeholder-stone-400 focus:outline-none shadow-[2px_2px_0px_0px_#1A1A1A]"
+              />
+            </div>
             <button
               type="submit"
               disabled={isLoading}
