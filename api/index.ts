@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getApp } from '../server';
+const { getApp } = require('../dist/server.cjs') as { getApp: () => Promise<any> };
 
 function restoreApiPath(req: VercelRequest) {
   const rawPath = req.query.path;
