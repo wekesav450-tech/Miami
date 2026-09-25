@@ -45,6 +45,7 @@ export default function App() {
   const [isTrackOpen, setIsTrackOpen] = useState<boolean>(false);
   const [isAdminOpen, setIsAdminOpen] = useState<boolean>(false);
   const [trackOrderNumber, setTrackOrderNumber] = useState<string>('');
+  const [trackCustomerPhone, setTrackCustomerPhone] = useState<string>('');
 
   // Live Toast Notification
   const [toast, setToast] = useState<{ message: string; type?: 'info' | 'success' } | null>(null);
@@ -178,6 +179,7 @@ export default function App() {
   // Handlers for Orders and Bookings
   const handleOrderSuccess = (order: Order) => {
     setTrackOrderNumber(order.order_number);
+    setTrackCustomerPhone(order.customer_phone);
     setToast({
       message: `Order #${order.order_number} placed successfully!`,
       type: 'success',
@@ -315,8 +317,10 @@ export default function App() {
         onClose={() => {
           setIsTrackOpen(false);
           setTrackOrderNumber('');
+          setTrackCustomerPhone('');
         }}
         initialOrderNumber={trackOrderNumber}
+        initialCustomerPhone={trackCustomerPhone}
         user={user}
       />
 
