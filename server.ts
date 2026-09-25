@@ -10,7 +10,7 @@ import { createSupabaseReservation, getSupabaseReservations, updateSupabaseReser
 import { generateToken, verifyToken, authMiddleware, optionalAuthMiddleware, adminOnlyMiddleware, isValidKenyanPhone, formatKenyanPhone, AuthRequest } from './server/auth.js';
 import { realtimeHub } from './server/realtime.js';
 
-async function createApp() {
+async function createApp(): Promise<import('express').Express> {
   const app = express();
   const PORT = 3000;
   app.use(express.json({ limit: '5mb' }));
@@ -112,7 +112,7 @@ async function createApp() {
       if (!Number.isInteger(size) || size < 1 || size > 50) return res.status(400).json({ error: 'Party size must be between 1 and 50' });
       const customerId = req.user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(req.user.id) ? req.user.id : null;
       const reservation = await createSupabaseReservation({ customer_id: customerId, customer_name: String(customer_name).trim(), customer_phone: formatKenyanPhone(phone), customer_email: customer_email || req.user?.email || null, reservation_date, reservation_time, number_of_guests: size, special_requests: special_requests || null });
-      realtimeHub.broadcastOrderEvent('reservation_created', reservation);
+      realtimeHub.broadcastReservationEvent('new_reservation', reservation);
       res.status(201).json({ reservation, restaurantPhone: '0741775878', message: 'Reservation received successfully' });
     } catch (err: any) { console.error('Reservation booking error:', err); res.status(500).json({ error: err.message || 'Failed to create reservation' }); }
   });
@@ -271,7 +271,7 @@ async function createApp() {
   });
 
   app.patch('/api/admin/reservations/:id/status', authMiddleware, adminOnlyMiddleware, async (req, res) => {
-    try { const { status } = req.body; if (!['pending', 'confirmed', 'seated', 'completed', 'cancelled'].includes(status)) return res.status(400).json({ error: 'Invalid reservation status' }); const reservation = await updateSupabaseReservationStatus(req.params.id, status); if (!reservation) return res.status(404).json({ error: 'Reservation not found' }); realtimeHub.broadcastOrderEvent('reservation_updated', reservation); res.json({ reservation }); }
+    try { const { status } = req.body; if (!['pending', 'confirmed', 'seated', 'completed', 'cancelled'].includes(status)) return res.status(400).json({ error: 'Invalid reservation status' }); const reservation = await updateSupabaseReservationStatus(req.params.id, status); if (!reservation) return res.status(404).json({ error: 'Reservation not found' }); realtimeHub.broadcastReservationEvent('reservation_updated', reservation); res.json({ reservation }); }
     catch (err: any) { console.error('Update reservation status error:', err); res.status(500).json({ error: err.message || 'Failed to update reservation status' }); }
   });
 
@@ -287,5 +287,5 @@ async function createApp() {
 }
 
 let appPromise: ReturnType<typeof createApp> | undefined;
-export function getApp() { if (!appPromise) appPromise = createApp(); return appPromise; }
+export function getApp(): Promise<import('express').Express> { if (!appPromise) appPromise = createApp(); return appPromise; }
 if (process.env.VERCEL !== '1') getApp().then(app => app.listen(3000, '0.0.0.0')).catch(err => console.error('Fatal server boot error:', err));
