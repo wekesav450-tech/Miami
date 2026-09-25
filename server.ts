@@ -29,7 +29,7 @@ async function createApp() {
       const cleanPhone = String(phone || '').trim().replace(/[\s()\-]/g, '');
       if (!isValidKenyanPhone(cleanPhone)) return res.status(400).json({ error: 'Please provide a valid Kenyan phone number' });
 
-      const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+      const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '');
       const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '').trim();
       if (!url || !key) return res.status(500).json({ error: 'Supabase server authentication is not configured' });
 
