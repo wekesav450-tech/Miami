@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-const { getApp } = require('../dist/server.cjs') as { getApp: () => Promise<any> };
+async function loadGetApp() {\n  const serverModule = await import('../dist/server.cjs');\n  return serverModule.getApp as () => Promise<any>;\n}
 
 function restoreApiPath(req: VercelRequest) {
   const rawPath = req.query.path;
@@ -20,7 +20,7 @@ function restoreApiPath(req: VercelRequest) {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     restoreApiPath(req);
-    const app = await getApp();
+    const getApp = await loadGetApp();\n    const app = await getApp();
     // Express applications are callable functions, but preserve compatibility with
     // wrapped/bundled Express exports by invoking the native request handler.
     if (typeof app === 'function') return app(req, res);
