@@ -21,11 +21,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     restoreApiPath(req);
     const app = await getApp();
-    const handler = typeof app === 'function' ? app : (app as any)?.default;
-    if (typeof handler !== 'function') {
-      throw new Error('API app handler is not callable');
+    // Express applications are callable functions, but preserve compatibility with
+    // wrapped/bundled Express exports by invoking the native request handler.
+    if (typeof app === 'function') return app(req, res);
+    if (app && typeof (app as any).handle === 'function') {
+      return (app as any).handle(req, res);
     }
-    return handler(req, res);
+    throw new Error('API app handler is not callable');
   } catch (error) {
     console.error('[Miami API] Failed to initialize API:', error);
     return res.status(500).json({ error: 'Failed to initialize API' });
