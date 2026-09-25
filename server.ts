@@ -3,7 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { createServer as createViteServer } from 'vite';
-import { db } from './server/db.js';
+import { getSupabaseCategories, getSupabaseMenuItems, updateSupabaseMenuItem } from './server/supabase-menu.ts';
 import { createSupabaseOrder, getSupabaseOrders, updateSupabaseOrderStatus, updateSupabaseOrderPayment } from './server/supabase-orders.ts';
 import { createSupabaseReservation, getSupabaseReservations, updateSupabaseReservationStatus } from './server/supabase-reservations.ts';
 import { generateToken, verifyToken, authMiddleware, optionalAuthMiddleware, adminOnlyMiddleware, isValidKenyanPhone, formatKenyanPhone, AuthRequest } from './server/auth.js';
@@ -78,25 +78,25 @@ async function createApp() {
     }
   });
 
-  // Menu remains backed by the existing seeded menu data so dishes are preserved.
-  app.get('/api/menu/categories', (_req, res) => {
-    try { res.json({ categories: db.getCategories() }); }
-    catch (err: any) { console.error('Fetch categories error:', err); res.status(500).json({ error: 'Failed to retrieve menu categories' }); }
+  // Menu is persistent in Supabase. Vercel must never write menu state to the server filesystem.
+  app.get('/api/menu/categories', async (_req, res) => {
+    try { res.json({ categories: await getSupabaseCategories() }); }
+    catch (err: any) { console.error('Fetch categories error:', err); res.status(500).json({ error: err.message || 'Failed to retrieve menu categories' }); }
   });
 
-  app.get('/api/menu/items', (req, res) => {
-    try { res.json({ items: db.getMenuItems(req.query.all === 'true') }); }
-    catch (err: any) { console.error('Fetch menu items error:', err); res.status(500).json({ error: 'Failed to retrieve menu items' }); }
+  app.get('/api/menu/items', async (req, res) => {
+    try { res.json({ items: await getSupabaseMenuItems(req.query.all === 'true') }); }
+    catch (err: any) { console.error('Fetch menu items error:', err); res.status(500).json({ error: err.message || 'Failed to retrieve menu items' }); }
   });
 
-  app.patch('/api/admin/menu/items/:id', authMiddleware, adminOnlyMiddleware, (req, res) => {
+  app.patch('/api/admin/menu/items/:id', authMiddleware, adminOnlyMiddleware, async (req, res) => {
     try {
       const { is_available, price_kes, name, description, is_featured, image_url } = req.body;
-      const updated = db.updateMenuItem(req.params.id, { is_available, price_kes: price_kes !== undefined ? Number(price_kes) : undefined, name, description, is_featured, image_url });
+      const updated = await updateSupabaseMenuItem(req.params.id, { is_available, price_kes: price_kes !== undefined ? Number(price_kes) : undefined, name, description, is_featured, image_url });
       if (!updated) return res.status(404).json({ error: 'Menu item not found' });
       realtimeHub.broadcastPublic('menu_updated', updated);
       res.json({ item: updated });
-    } catch (err: any) { console.error('Update menu item error:', err); res.status(500).json({ error: 'Failed to update menu item' }); }
+    } catch (err: any) { console.error('Update menu item error:', err); res.status(500).json({ error: err.message || 'Failed to update menu item' }); }
   });
 
   // Reservations use Supabase as the persistent source of truth on Vercel.
@@ -176,11 +176,11 @@ async function createApp() {
     try {
       const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/+$/, '');
       const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-      if (!url || !key) return res.json({ settings: db.getSettings() });
+      if (!url || !key) return res.status(500).json({ error: 'Supabase server configuration is missing' });
       const r = await fetch(url + '/rest/v1/settings?select=delivery_fee_kes,currency,business_name,pochi_number,phone,address&limit=1', { headers: { apikey: key, Authorization: 'Bearer ' + key } });
       if (!r.ok) throw new Error(await r.text());
       const rows = await r.json();
-      res.json({ settings: rows[0] || db.getSettings() });
+      res.json({ settings: rows[0] || { delivery_fee_kes: 150, currency: 'KES', business_name: 'New Miami Restaurant', pochi_number: '0741775878', phone: '0741775878', address: 'Kenyatta Avenue, Naivasha, Kenya' } });
     } catch (err: any) { console.error('Public settings error:', err); res.status(500).json({ error: 'Failed to load restaurant settings' }); }
   });
 
@@ -232,7 +232,7 @@ async function createApp() {
     try {
       const orders = await getSupabaseOrders();
       const reservations = await getSupabaseReservations();
-      const menuItems = db.getMenuItems(true);
+      const menuItems = await getSupabaseMenuItems(true);
       const today = new Date().toISOString().slice(0, 10);
       const paidOrders = orders.filter((o: any) => o.payment_status === 'paid');
       const totalRevenueKes = paidOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount || 0), 0);
