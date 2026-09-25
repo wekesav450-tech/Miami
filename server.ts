@@ -133,11 +133,18 @@ async function createApp(): Promise<import('express').Express> {
 
 
   // Customer order/reservation history and public settings.
-  app.get('/api/orders/track/:orderNumber', async (req, res) => {
+  app.get('/api/orders/track/:orderNumber', optionalAuthMiddleware, async (req: AuthRequest, res) => {
     try {
       const orders = await getSupabaseOrders();
       const order = orders.find((o: any) => String(o.order_number || '').toUpperCase() === String(req.params.orderNumber || '').trim().toUpperCase());
       if (!order) return res.status(404).json({ error: 'Order not found' });
+
+      const suppliedPhone = typeof req.query.phone === 'string' ? req.query.phone.trim() : '';
+      const normalizedSuppliedPhone = suppliedPhone && isValidKenyanPhone(suppliedPhone) ? formatKenyanPhone(suppliedPhone) : '';
+      const isAuthenticatedOwner = Boolean(req.user?.id && order.customer_id && req.user.id === order.customer_id);
+      if (!isAuthenticatedOwner && (!normalizedSuppliedPhone || formatKenyanPhone(String(order.customer_phone || '')) !== normalizedSuppliedPhone)) {
+        return res.status(403).json({ error: 'Order number and customer phone number are required to view this order' });
+      }
       const [items, payments] = await Promise.all([
         (async () => {
           const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
@@ -154,7 +161,9 @@ async function createApp(): Promise<import('express').Express> {
           return r.ok ? await r.json() : [];
         })()
       ]);
-      res.json({ order: { ...order, items, payment: payments[0] } });
+      const safePayment = payments[0] ? { status: payments[0].status, amount: payments[0].amount, currency: payments[0].currency, payment_method: payments[0].payment_method } : undefined;
+      const safeOrder = { ...order, customer_id: undefined, customer_email: undefined, notes: undefined, items, payment: safePayment };
+      res.json({ order: safeOrder });
     } catch (err: any) { res.status(500).json({ error: err.message || 'Failed to track order' }); }
   });
 
