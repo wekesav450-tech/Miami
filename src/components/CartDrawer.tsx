@@ -20,6 +20,15 @@ import confetti from 'canvas-confetti';
 import { CartItem, OrderType, PaymentMethod, Order, UserProfile } from '../types';
 import { api } from '../services/api';
 
+interface RestaurantSettings {
+  delivery_fee_kes: number;
+  currency: string;
+  business_name: string;
+  pochi_number: string;
+  phone: string;
+  address: string;
+}
+
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -54,6 +63,21 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [placedOrder, setPlacedOrder] = useState<Order | null>(null);
   const [copiedPochi, setCopiedPochi] = useState(false);
+  const [restaurantSettings, setRestaurantSettings] = useState<RestaurantSettings>({
+    delivery_fee_kes: 150,
+    currency: 'KES',
+    business_name: 'New Miami Restaurant',
+    pochi_number: '0741775878',
+    phone: '0741775878',
+    address: 'Kenyatta Avenue, Naivasha, Kenya',
+  });
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    api.settings.get()
+      .then((res) => setRestaurantSettings(res.settings))
+      .catch(() => {});
+  }, [isOpen]);
 
   // Sync user info if user logs in
   React.useEffect(() => {
@@ -68,11 +92,11 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
   // Pricing calculations
   const subtotal = cart.reduce((acc, item) => acc + item.menuItem.price_kes * item.quantity, 0);
-  const deliveryFee = orderType === 'delivery' ? 150 : 0;
+  const deliveryFee = orderType === 'delivery' ? restaurantSettings.delivery_fee_kes : 0;
   const totalAmount = subtotal + deliveryFee;
 
   const handleCopyPochi = () => {
-    navigator.clipboard.writeText('0741775878');
+    navigator.clipboard.writeText(restaurantSettings.pochi_number);
     setCopiedPochi(true);
     setTimeout(() => setCopiedPochi(false), 2500);
   };
@@ -223,20 +247,20 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </div>
 
               <p className="text-[11px] text-stone-700 leading-relaxed">
-                Send <strong>KES {placedOrder.total_amount.toLocaleString()}</strong> to Pochi <strong>0741775878</strong> (New Miami Restaurant). Your payment status remains <em>pending</em> until restaurant staff manually verify the transaction.
+                Send <strong>KES {placedOrder.total_amount.toLocaleString()}</strong> to Pochi <strong>{restaurantSettings.pochi_number}</strong> ({restaurantSettings.business_name}). Your payment status remains <em>pending</em> until restaurant staff manually verify the transaction.
               </p>
             </div>
 
             {/* WhatsApp Direct Notification */}
             <div className="space-y-3">
               <a
-                href={`https://wa.me/254741775878?text=Hello%20New%20Miami%20Restaurant,%20I%20have%20placed%20Order%20${placedOrder.order_number}%20for%20KES%20${placedOrder.total_amount}.%20Customer:%20${encodeURIComponent(placedOrder.customer_name)}`}
+                href={`https://wa.me/${restaurantSettings.phone.replace(/^0/, '254')}?text=Hello%20New%20Miami%20Restaurant,%20I%20have%20placed%20Order%20${placedOrder.order_number}%20for%20KES%20${placedOrder.total_amount}.%20Customer:%20${encodeURIComponent(placedOrder.customer_name)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 text-sm border-2 border-[#1A1A1A] shadow-[4px_4px_0px_0px_#1A1A1A] transition"
               >
                 <Phone className="w-4 h-4" />
-                <span>Notify Kitchen on WhatsApp (0741775878)</span>
+                <span>Notify Kitchen on WhatsApp ({restaurantSettings.phone})</span>
                 <ExternalLink className="w-3.5 h-3.5 opacity-70" />
               </a>
 
@@ -479,7 +503,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                                 M-Pesa Pochi la Biashara
                               </span>
                               <p className="text-[11px] text-amber-800 font-mono font-bold">
-                                Pochi: 0741775878
+                                Pochi: {restaurantSettings.pochi_number}
                               </p>
                             </div>
                           </div>
@@ -491,7 +515,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                         {paymentMethod === 'mpesa_pochi' && (
                           <div className="mt-3 pt-3 border-t-2 border-[#1A1A1A]/20 text-[11px] text-stone-800 space-y-2">
                             <p>
-                              Send payment to Pochi <strong>0741775878</strong> (New Miami Restaurant). You can optionally paste your M-Pesa transaction code below for staff to verify:
+                              Send payment to Pochi <strong>{restaurantSettings.pochi_number}</strong> ({restaurantSettings.business_name}). You can optionally paste your M-Pesa transaction code below for staff to verify:
                             </p>
                             <input
                               id="order-mpesa-code-input"
