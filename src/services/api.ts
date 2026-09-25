@@ -7,7 +7,7 @@ import {
 const TOKEN_KEY = 'nmr_auth_token';
 const USER_KEY = 'nmr_user_profile';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_PUBLISHABLE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY) as string | undefined;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
 const supabase = SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY ? createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { autoRefreshToken: true, persistSession: true } }) : null;
 function requireSupabase() { if (!supabase) throw new Error('Supabase login is not configured yet. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in Vercel, then redeploy.'); return supabase; }
 
@@ -24,12 +24,15 @@ export const authStorage = {
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   // Always prefer the current Supabase session token. Supabase can refresh an
   // expired access token while an old token remains in localStorage.
-  let token = authStorage.getToken();
+  let token: string | null = null;
   if (supabase) {
     const { data } = await supabase.auth.getSession();
     if (data.session?.access_token) {
       token = data.session.access_token;
       authStorage.setToken(token);
+    } else {
+      authStorage.removeToken();
+      authStorage.removeProfile();
     }
   }
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options.headers as Record<string, string>) };
@@ -45,7 +48,7 @@ async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promi
 
 export const api = {
   auth: {
-    async register(data: { full_name: string; email: string; phone: string; password: string }): Promise<{ profile: UserProfile; token: string }> { const res = await apiRequest<{ profile: UserProfile; token: string; refresh_token?: string }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }); if (supabase && res.token && res.refresh_token) { const { error } = await supabase.auth.setSession({ access_token: res.token, refresh_token: res.refresh_token }); if (error) throw new Error(error.message); } authStorage.setToken(res.token); authStorage.setProfile(res.profile); return { profile: res.profile, token: res.token }; },
+    async register(data: { full_name: string; email: string; phone: string; password: string }): Promise<{ profile: UserProfile; token: string }> { const res = await apiRequest<{ profile: UserProfile; token: string; refresh_token?: string }>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }); if (supabase && res.token && res.refresh_token) { const { error } = await supabase.auth.setSession({ access_token: res.token, refresh_token: res.refresh_token }); if (error) throw new Error(error.message); } if (!res.token || !res.refresh_token) { authStorage.clear(); throw new Error('Registration did not return a valid authentication session'); } authStorage.setToken(res.token); authStorage.setProfile(res.profile); return { profile: res.profile, token: res.token }; },
     async login(data: { email: string; password: string }): Promise<{ profile: UserProfile; token: string }> {
       const { data: authData, error } = await requireSupabase().auth.signInWithPassword({ email: data.email.trim(), password: data.password });
       if (error) throw new Error(error.message);
