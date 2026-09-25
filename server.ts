@@ -70,8 +70,8 @@ async function createApp() {
       const loginText = await loginResponse.text();
       let session: any = {};
       try { session = loginText ? JSON.parse(loginText) : {}; } catch {}
-      if (!loginResponse.ok || !session.access_token) return res.status(201).json({ profile: Array.isArray(profile) ? profile[0] : profile, token: '' });
-      res.status(201).json({ profile: Array.isArray(profile) ? profile[0] : profile, token: session.access_token });
+      if (!loginResponse.ok || !session.access_token) return res.status(201).json({ profile: Array.isArray(profile) ? profile[0] : profile, token: '', refresh_token: '' });
+      res.status(201).json({ profile: Array.isArray(profile) ? profile[0] : profile, token: session.access_token, refresh_token: session.refresh_token || '' });
     } catch (err: any) {
       console.error('Registration error:', err);
       res.status(500).json({ error: err.message || 'Failed to register account' });
