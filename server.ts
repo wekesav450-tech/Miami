@@ -1,4 +1,5 @@
-import express from 'express';
+import * as expressModule from 'express';
+const express = ((expressModule as any).default || expressModule) as typeof import('express');
 import path from 'path';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
