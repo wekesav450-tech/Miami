@@ -49,17 +49,21 @@ async function createApp(): Promise<import('express').Express> {
       }
 
       const userId = created.id;
-      const profileResponse = await fetch(url + '/rest/v1/profiles', {
+      // Some Supabase projects create the profile automatically from an Auth trigger.
+      // Upsert here so registration works whether the profile already exists or not.
+      const profileResponse = await fetch(url + '/rest/v1/profiles?on_conflict=id', {
         method: 'POST',
-        headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
         body: JSON.stringify({ id: userId, full_name: String(full_name).trim(), email: String(email).trim().toLowerCase(), phone: formatKenyanPhone(cleanPhone), role: 'customer' }),
       });
       const profileText = await profileResponse.text();
       let profile: any = {};
       try { profile = profileText ? JSON.parse(profileText) : {}; } catch {}
       if (!profileResponse.ok) {
-        console.error('Profile creation after registration failed:', profileText);
-        return res.status(500).json({ error: 'Account was created but the customer profile could not be created' });
+        console.error('Profile upsert after registration failed:', profileText);
+        // Do not leave an Auth user behind when its application profile cannot be persisted.
+        await fetch(url + '/auth/v1/admin/users/' + encodeURIComponent(userId), { method: 'DELETE', headers: { apikey: key, Authorization: 'Bearer ' + key } }).catch(() => undefined);
+        return res.status(500).json({ error: 'Customer profile could not be created. Registration was rolled back.' });
       }
 
       // Sign in through Supabase Auth so the frontend receives a real access token.
