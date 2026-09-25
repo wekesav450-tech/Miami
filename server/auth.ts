@@ -15,7 +15,7 @@ export function verifyToken(token: string): { userId: string; email: string; rol
 }
 
 async function getSupabaseProfile(token: string): Promise<ProfileRecord | null> {
-  const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '').replace(/\/rest\/v1$/i, '');
+  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim().replace(/\/+$/, '').replace(/\/rest\/v1$/i, '');
   const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '').trim();
   if (!url || !key) return null;
   const headers: Record<string, string> = { apikey: key, Authorization: `Bearer ${token}` };
