@@ -54,7 +54,7 @@ async function createApp(): Promise<import('express').Express> {
       const profileResponse = await fetch(url + '/rest/v1/profiles?on_conflict=id', {
         method: 'POST',
         headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
-        body: JSON.stringify({ id: userId, full_name: String(full_name).trim(), email: String(email).trim().toLowerCase(), phone: formatKenyanPhone(cleanPhone), role: 'customer' }),
+        body: JSON.stringify({ id: userId, full_name: String(full_name).trim(), email: String(email).trim().toLowerCase(), phone: formatKenyanPhone(cleanPhone), role: 'customer', password_hash: await bcrypt.hash(String(password), 12) }),
       });
       const profileText = await profileResponse.text();
       let profile: any = {};
