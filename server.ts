@@ -283,7 +283,11 @@ async function createApp(): Promise<import('express').Express> {
     app.use(express.static(distPath));
     app.get('*', (_req, res) => res.sendFile(path.join(distPath, 'index.html')));
   }
-  // Return JSON for unknown API routes instead of falling through to the SPA.\n  // This prevents serverless /api requests from trying to read dist/index.html.\n  app.use('/api', (_req, res) => res.status(404).json({ error: 'API endpoint not found' }));\n\n  return app;
+  // Return JSON for unknown API routes instead of falling through to the SPA.
+  // This prevents serverless /api requests from trying to read dist/index.html.
+  app.use('/api', (_req, res) => res.status(404).json({ error: 'API endpoint not found' }));
+
+  return app;
 }
 
 let appPromise: ReturnType<typeof createApp> | undefined;
