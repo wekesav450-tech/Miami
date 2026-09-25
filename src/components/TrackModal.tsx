@@ -20,6 +20,7 @@ interface TrackModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialOrderNumber?: string;
+  initialCustomerPhone?: string;
   user: UserProfile | null;
 }
 
@@ -27,9 +28,11 @@ export const TrackModal: React.FC<TrackModalProps> = ({
   isOpen,
   onClose,
   initialOrderNumber = '',
+  initialCustomerPhone = '',
   user,
 }) => {
   const [searchQuery, setSearchQuery] = useState(initialOrderNumber);
+  const [phoneQuery, setPhoneQuery] = useState(initialCustomerPhone || user?.phone || '');
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -56,16 +59,21 @@ export const TrackModal: React.FC<TrackModalProps> = ({
   // If initialOrderNumber provided, search immediately
   React.useEffect(() => {
     if (initialOrderNumber && isOpen) {
-      handleSearch(initialOrderNumber);
+      handleSearch(initialOrderNumber, initialCustomerPhone || user?.phone || '');
     }
   }, [initialOrderNumber, isOpen]);
 
   if (!isOpen) return null;
 
-  const handleSearch = async (queryToUse?: string) => {
+  const handleSearch = async (queryToUse?: string, phoneToUse?: string) => {
     const q = (queryToUse || searchQuery).trim();
+    const phone = (phoneToUse ?? phoneQuery).trim();
     if (!q) {
       setErrorMessage('Please enter an order number (e.g. NMR-2026-1234)');
+      return;
+    }
+    if (!phone) {
+      setErrorMessage('Please enter the customer phone number used for the order');
       return;
     }
 
@@ -74,7 +82,7 @@ export const TrackModal: React.FC<TrackModalProps> = ({
     setCodeSuccessMessage(null);
 
     try {
-      const order = await api.orders.track(q);
+      const order = await api.orders.track(q, phone);
       setCurrentOrder(order);
     } catch (err: any) {
       console.error('Track order error:', err);
@@ -96,7 +104,7 @@ export const TrackModal: React.FC<TrackModalProps> = ({
       const res = await api.payments.submitMpesaCode(currentOrder.id, mpesaCodeInput.trim());
       setCodeSuccessMessage(res.message);
       // Refresh order details
-      const refreshed = await api.orders.track(currentOrder.order_number);
+      const refreshed = await api.orders.track(currentOrder.order_number, phoneQuery);
       setCurrentOrder(refreshed);
       setMpesaCodeInput('');
     } catch (err: any) {
@@ -187,9 +195,9 @@ export const TrackModal: React.FC<TrackModalProps> = ({
               e.preventDefault();
               handleSearch();
             }}
-            className="flex gap-2"
+            className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2"
           >
-            <div className="relative flex-1">
+            <div className="relative">
               <Search className="w-4 h-4 text-stone-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
