@@ -30,8 +30,8 @@ async function createApp(): Promise<import('express').Express> {
       const cleanPhone = String(phone || '').trim().replace(/[\s()\-]/g, '');
       if (!isValidKenyanPhone(cleanPhone)) return res.status(400).json({ error: 'Please provide a valid Kenyan phone number' });
 
-      const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
-      const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '').trim();
+      const url = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+      const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
       if (!url || !key) return res.status(500).json({ error: 'Supabase server authentication is not configured' });
 
       const createResponse = await fetch(url + '/auth/v1/admin/users', {
@@ -71,7 +71,11 @@ async function createApp(): Promise<import('express').Express> {
       const loginText = await loginResponse.text();
       let session: any = {};
       try { session = loginText ? JSON.parse(loginText) : {}; } catch {}
-      if (!loginResponse.ok || !session.access_token) return res.status(201).json({ profile: Array.isArray(profile) ? profile[0] : profile, token: '', refresh_token: '' });
+      if (!loginResponse.ok || !session.access_token || !session.refresh_token) {
+        // Never create a partially authenticated account. Remove the Auth user if session creation failed.
+        await fetch(url + '/auth/v1/admin/users/' + encodeURIComponent(userId), { method: 'DELETE', headers: { apikey: key, Authorization: 'Bearer ' + key } }).catch(() => undefined);
+        return res.status(502).json({ error: 'Account could not be authenticated after registration' });
+      }
       res.status(201).json({ profile: Array.isArray(profile) ? profile[0] : profile, token: session.access_token, refresh_token: session.refresh_token || '' });
     } catch (err: any) {
       console.error('Registration error:', err);
@@ -147,15 +151,15 @@ async function createApp(): Promise<import('express').Express> {
       }
       const [items, payments] = await Promise.all([
         (async () => {
-          const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-          const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+          const url = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+          const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
           if (!url || !key) return [];
           const r = await fetch(url + '/rest/v1/order_items?order_id=eq.' + encodeURIComponent(order.id) + '&select=*', { headers: { apikey: key, Authorization: 'Bearer ' + key } });
           return r.ok ? await r.json() : [];
         })(),
         (async () => {
-          const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-          const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+          const url = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+          const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
           if (!url || !key) return [];
           const r = await fetch(url + '/rest/v1/payments?order_id=eq.' + encodeURIComponent(order.id) + '&select=*', { headers: { apikey: key, Authorization: 'Bearer ' + key } });
           return r.ok ? await r.json() : [];
@@ -184,13 +188,14 @@ async function createApp(): Promise<import('express').Express> {
 
   app.get('/api/settings', async (_req, res) => {
     try {
-      const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-      const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+      const url = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+      const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
       if (!url || !key) return res.status(500).json({ error: 'Supabase server configuration is missing' });
       const r = await fetch(url + '/rest/v1/settings?select=delivery_fee_kes,currency,business_name,pochi_number,phone,address&limit=1', { headers: { apikey: key, Authorization: 'Bearer ' + key } });
       if (!r.ok) throw new Error(await r.text());
       const rows = await r.json();
-      res.json({ settings: rows[0] || { delivery_fee_kes: 150, currency: 'KES', business_name: 'New Miami Restaurant', pochi_number: '0741775878', phone: '0741775878', address: 'Kenyatta Avenue, Naivasha, Kenya' } });
+      if (!Array.isArray(rows) || !rows[0]) return res.status(503).json({ error: 'Restaurant settings are not configured' });
+      res.json({ settings: rows[0] });
     } catch (err: any) { console.error('Public settings error:', err); res.status(500).json({ error: 'Failed to load restaurant settings' }); }
   });
 
@@ -202,8 +207,8 @@ async function createApp(): Promise<import('express').Express> {
       const order = orders.find((o: any) => o.id === order_id);
       if (!order) return res.status(404).json({ error: 'Order not found' });
       if (order.customer_id && order.customer_id !== req.user?.id) return res.status(403).json({ error: 'You can only submit payment for your own order' });
-      const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-      const key = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+      const url = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+      const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
       const r = await fetch(url + '/rest/v1/payments?order_id=eq.' + encodeURIComponent(order_id), { method: 'PATCH', headers: { apikey: key, Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify({ transaction_reference: String(transaction_reference).trim().toUpperCase() }) });
       if (!r.ok) throw new Error(await r.text());
       res.json({ success: true, message: 'M-Pesa reference submitted. Payment remains pending until verified by authorized staff.' });
@@ -227,8 +232,8 @@ async function createApp(): Promise<import('express').Express> {
       const updates: Record<string, unknown> = {};
       for (const key of allowed) if (req.body?.[key] !== undefined) updates[key] = req.body[key];
       updates.updated_at = new Date().toISOString();
-      const url = (process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/+$/, '');
-      const secret = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+      const url = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+      const secret = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
       if (!url || !secret) return res.status(500).json({ error: 'Supabase server configuration is missing' });
       const r = await fetch(url + '/rest/v1/settings', { method: 'PATCH', headers: { apikey: secret, Authorization: 'Bearer ' + secret, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: JSON.stringify(updates) });
       if (!r.ok) throw new Error(await r.text());
