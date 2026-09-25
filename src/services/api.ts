@@ -54,13 +54,11 @@ export const api = {
       if (error) throw new Error(error.message);
       const authUser = authData.user;
       if (!authUser || !authData.session) throw new Error('Supabase did not return an authenticated session');
-      const { data: profileData, error: profileError } = await requireSupabase().from('profiles').select('id, full_name, email, phone, role, created_at, updated_at').eq('id', authUser.id).single();
-      if (profileError || !profileData) { await requireSupabase().auth.signOut(); throw new Error('Your account profile could not be loaded'); }
-      const profile = profileData as UserProfile;
+      const { profile } = await apiRequest<{ profile: UserProfile }>('/api/auth/profile');
       authStorage.setToken(authData.session.access_token); authStorage.setProfile(profile); return { profile, token: authData.session.access_token };
     },
     async getMe(): Promise<UserProfile | null> {
-      try { const { data: { user } } = await requireSupabase().auth.getUser(); if (!user) throw new Error('No authenticated user'); const { data, error } = await requireSupabase().from('profiles').select('id, full_name, email, phone, role, created_at, updated_at').eq('id', user.id).single(); if (error || !data) throw error || new Error('Profile not found'); const profile = data as UserProfile; authStorage.setProfile(profile); const { data: sessionData } = await requireSupabase().auth.getSession(); if (sessionData.session?.access_token) authStorage.setToken(sessionData.session.access_token); return profile; } catch { authStorage.clear(); return null; }
+      try { const { data: { user } } = await requireSupabase().auth.getUser(); if (!user) throw new Error('No authenticated user'); const { profile } = await apiRequest<{ profile: UserProfile }>('/api/auth/profile'); authStorage.setProfile(profile); const { data: sessionData } = await requireSupabase().auth.getSession(); if (sessionData.session?.access_token) authStorage.setToken(sessionData.session.access_token); return profile; } catch { authStorage.clear(); return null; }
     },
     logout() { if (supabase) void supabase.auth.signOut(); authStorage.clear(); },
   },
