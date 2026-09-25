@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { db, type ProfileRecord } from './db.ts';
+import type { ProfileRecord } from './db.ts';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'new_miami_restaurant_jwt_secure_key_naivasha';
 
@@ -36,10 +36,8 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
   if (supabaseProfile) { req.user = supabaseProfile; return next(); }
   const decoded = verifyToken(token);
   if (!decoded) return res.status(401).json({ error: 'Invalid or expired token' });
-  const profile = db.findProfileById(decoded.userId);
-  if (!profile) return res.status(401).json({ error: 'User account not found' });
-  req.user = profile;
-  next();
+  // Supabase is the production identity source. Do not fall back to the Vercel filesystem database.
+  return res.status(401).json({ error: 'Invalid or expired authentication session' });
 }
 
 export async function optionalAuthMiddleware(req: AuthRequest, _res: Response, next: NextFunction) {
@@ -47,7 +45,7 @@ export async function optionalAuthMiddleware(req: AuthRequest, _res: Response, n
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7);
     req.user = await getSupabaseProfile(token) || undefined;
-    if (!req.user) { const decoded = verifyToken(token); if (decoded) req.user = db.findProfileById(decoded.userId); }
+    if (!req.user) { verifyToken(token); }
   }
   next();
 }
